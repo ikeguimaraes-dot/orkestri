@@ -3,9 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/result";
-import type { Employee, EmployeeInsert, EmployeeUpdate } from "@/types/pessoas";
+import type {
+  Employee,
+  EmployeeInsert,
+  EmployeeUpdate,
+  Shift,
+  ShiftInsert,
+  ShiftUpdate,
+} from "@/types/pessoas";
 
 const TABLE = "employees" as const;
+const SHIFTS_TABLE = "shifts" as const;
 
 // Nota: o builder do @supabase/ssr infere `never` em insert/update quando
 // PostgrestVersion 12 + custom Database<T>. As entradas já estão validadas
@@ -106,6 +114,106 @@ export async function updateEmployee(
     revalidatePath("/pessoas/colaboradores");
     revalidatePath(`/pessoas/colaboradores/${id}/editar`);
     return { ok: true, data: data as Employee };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Erro inesperado",
+    };
+  }
+}
+
+/**
+ * Lista turnos da unit num intervalo (inclusivo). RLS já restringe à unit.
+ * Datas em ISO "YYYY-MM-DD".
+ */
+export async function listShifts(
+  unitId: string,
+  dataInicio: string,
+  dataFim: string,
+): Promise<Shift[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) {
+      console.warn("[listShifts] supabase indisponível");
+      return [];
+    }
+    const { data, error } = await supabase
+      .from(SHIFTS_TABLE)
+      .select("*")
+      .eq("unit_id", unitId)
+      .gte("data", dataInicio)
+      .lte("data", dataFim)
+      .order("data", { ascending: true })
+      .order("hora_inicio", { ascending: true });
+    if (error) {
+      console.error("[listShifts] query error:", error.message, "unit:", unitId);
+      return [];
+    }
+    return (data as Shift[] | null) ?? [];
+  } catch (e) {
+    console.error("[listShifts] exceção:", e);
+    return [];
+  }
+}
+
+export async function createShift(
+  input: ShiftInsert,
+): Promise<ActionResult<Shift>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(SHIFTS_TABLE)
+      .insert(input as never)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao criar turno" };
+    }
+    revalidatePath("/pessoas/escala");
+    return { ok: true, data: data as Shift };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Erro inesperado",
+    };
+  }
+}
+
+export async function updateShift(
+  id: string,
+  patch: ShiftUpdate,
+): Promise<ActionResult<Shift>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(SHIFTS_TABLE)
+      .update(patch as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao atualizar turno" };
+    }
+    revalidatePath("/pessoas/escala");
+    return { ok: true, data: data as Shift };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Erro inesperado",
+    };
+  }
+}
+
+export async function deleteShift(id: string): Promise<ActionResult<null>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { error } = await supabase.from(SHIFTS_TABLE).delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/pessoas/escala");
+    return { ok: true, data: null };
   } catch (e) {
     return {
       ok: false,
