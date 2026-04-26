@@ -5,6 +5,10 @@ import { requireUser } from "@/lib/auth/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Unit } from "@/types/database";
 
+// Layout chama cookies() via getCurrentUser — Next 16 não pode prerender estaticamente
+// rotas que dependem de request. Toda página dentro do (dashboard) é dynamic.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -34,14 +38,25 @@ export default async function DashboardLayout({
 }
 
 async function loadAccessibleUnits(): Promise<Unit[]> {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return [];
-  // RLS no servidor garante que só vem o que o user pode ver.
-  const { data, error } = await supabase
-    .from("units")
-    .select("*")
-    .eq("active", true)
-    .order("name");
-  if (error || !data) return [];
-  return data;
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) {
+      console.warn("[loadAccessibleUnits] supabase indisponível");
+      return [];
+    }
+    // RLS no servidor garante que só vem o que o user pode ver.
+    const { data, error } = await supabase
+      .from("units")
+      .select("*")
+      .eq("active", true)
+      .order("name");
+    if (error) {
+      console.error("[loadAccessibleUnits] query error:", error.message);
+      return [];
+    }
+    return data ?? [];
+  } catch (e) {
+    console.error("[loadAccessibleUnits] exceção:", e);
+    return [];
+  }
 }

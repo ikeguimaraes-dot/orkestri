@@ -2,11 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { ActionResult } from "@/lib/result";
 import type { Employee, EmployeeInsert, EmployeeUpdate } from "@/types/pessoas";
-
-export type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
 
 const TABLE = "employees" as const;
 
@@ -22,7 +19,10 @@ const TABLE = "employees" as const;
 export async function listEmployees(unitId: string): Promise<Employee[]> {
   try {
     const supabase = await createSupabaseServerClient();
-    if (!supabase) return [];
+    if (!supabase) {
+      console.warn("[listEmployees] supabase indisponível");
+      return [];
+    }
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
@@ -30,9 +30,13 @@ export async function listEmployees(unitId: string): Promise<Employee[]> {
       .order("ativo", { ascending: false })
       .order("nome", { ascending: true })
       .order("sobrenome", { ascending: true });
-    if (error || !data) return [];
-    return data as Employee[];
-  } catch {
+    if (error) {
+      console.error("[listEmployees] query error:", error.message, "unit:", unitId);
+      return [];
+    }
+    return (data as Employee[] | null) ?? [];
+  } catch (e) {
+    console.error("[listEmployees] exceção:", e);
     return [];
   }
 }
@@ -47,9 +51,13 @@ export async function getEmployee(id: string): Promise<Employee | null> {
       .select("*")
       .eq("id", id)
       .maybeSingle();
-    if (error || !data) return null;
-    return data as Employee;
-  } catch {
+    if (error) {
+      console.error("[getEmployee] query error:", error.message, "id:", id);
+      return null;
+    }
+    return (data as Employee | null) ?? null;
+  } catch (e) {
+    console.error("[getEmployee] exceção:", e);
     return null;
   }
 }
