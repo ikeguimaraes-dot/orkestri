@@ -166,6 +166,21 @@ export type PayslipInsert = {
 
 export type PayslipUpdate = Partial<Omit<PayslipInsert, "employee_id" | "competencia">>;
 
+// Holerite com employee anexo (resultado do listPayslips/getPayslip).
+export type PayslipWithEmployee = Payslip & {
+  employee: Pick<Employee, "id" | "nome" | "sobrenome" | "funcao" | "salario_base"> | null;
+};
+
+export type GeneratePayslipInput = {
+  employeeId: string;
+  mes: number;
+  ano: number;
+  gorjeta?: number;
+  dependentes?: number;
+  descontoVT?: number;
+  descontoVR?: number;
+};
+
 export type CCTVersion = {
   id: string;
   sindicato: string;
