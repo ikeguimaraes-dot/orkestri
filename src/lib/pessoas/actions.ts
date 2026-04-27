@@ -9,6 +9,7 @@ import type {
   AbsenceInsert,
   AbsenceTipo,
   AbsenceWithEmployee,
+  Dependent,
   Employee,
   EmployeeInsert,
   EmployeeScore,
@@ -89,6 +90,27 @@ export async function listEmployees(unitId: string): Promise<Employee[]> {
     return (data as Employee[] | null) ?? [];
   } catch (e) {
     console.error("[listEmployees] exceção:", e);
+    return [];
+  }
+}
+
+/** Lista dependentes de um colaborador. RLS filtra via employees.unit_id. */
+export async function listDependents(employeeId: string): Promise<Dependent[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("dependents")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("ordem", { ascending: true });
+    if (error) {
+      console.error("[listDependents] query error:", error.message, "employee:", employeeId);
+      return [];
+    }
+    return (data as Dependent[] | null) ?? [];
+  } catch (e) {
+    console.error("[listDependents] exceção:", e);
     return [];
   }
 }
