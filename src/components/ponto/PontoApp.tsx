@@ -37,6 +37,13 @@ const ICONS: Record<PunchTipo, React.ComponentType<{ size?: number; strokeWidth?
 
 type SuccessState = { punch: TimeClockPunch; at: number } | null;
 
+type DebugLine = { ts: string; tag: string; data: unknown };
+
+function tokenPreview(t: string | null | undefined): string {
+  if (!t) return "(null)";
+  return `${t.slice(0, 20)}…(${t.length} chars)`;
+}
+
 export function PontoApp({
   employeeId,
   employeeName,
@@ -52,12 +59,29 @@ export function PontoApp({
   initialAccessToken: string | null;
   initialRefreshToken: string | null;
 }) {
+  // Lê ?debug=1 do window — evita Suspense boundary do useSearchParams.
+  const [debugMode, setDebugMode] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDebugMode(sp.get("debug") === "1");
+  }, []);
+
   const [pending, startTransition] = useTransition();
   const [punches, setPunches] = useState<TimeClockPunch[]>(initialPunches);
   const [now, setNow] = useState<Date>(() => new Date());
   const [showCamera, setShowCamera] = useState(false);
   const [success, setSuccess] = useState<SuccessState>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugLog, setDebugLog] = useState<DebugLine[]>([]);
+
+  // Sempre acumula — só renderiza quando debugMode=true. Evita closure
+  // capturando valor stale de debugMode no primeiro mount.
+  const pushDebug = (tag: string, data: unknown) => {
+    const ts = new Date().toLocaleTimeString("pt-BR", { hour12: false });
+    setDebugLog((prev) => [...prev, { ts, tag, data }]);
+  };
 
   const geo = useGeolocation();
   const ua = useDeviceInfo();
@@ -73,13 +97,51 @@ export function PontoApp({
   // o server passa os tokens explicitamente e nós salvamos no storage local
   // (localStorage do @supabase/ssr) via setSession().
   useEffect(() => {
-    if (!initialAccessToken || !initialRefreshToken) return;
-    const c = getBrowserClient();
-    if (!c) return;
-    void c.auth.setSession({
-      access_token: initialAccessToken,
-      refresh_token: initialRefreshToken,
+    pushDebug("mount", {
+      employeeId,
+      hasAccessToken: !!initialAccessToken,
+      hasRefreshToken: !!initialRefreshToken,
+      accessTokenPreview: tokenPreview(initialAccessToken),
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      isStandalone:
+        typeof window !== "undefined" && window.matchMedia
+          ? window.matchMedia("(display-mode: standalone)").matches
+          : null,
     });
+    if (!initialAccessToken || !initialRefreshToken) {
+      pushDebug("seed.skip", "no tokens from server");
+      return;
+    }
+    const c = getBrowserClient();
+    if (!c) {
+      pushDebug("seed.skip", "no browser client");
+      return;
+    }
+    (async () => {
+      const set = await c.auth.setSession({
+        access_token: initialAccessToken,
+        refresh_token: initialRefreshToken,
+      });
+      pushDebug("seed.setSession", {
+        ok: !!set.data.session,
+        userId: set.data.user?.id ?? null,
+        error: set.error?.message ?? null,
+      });
+      const cur = await c.auth.getSession();
+      pushDebug("seed.getSession", {
+        ok: !!cur.data.session,
+        userId: cur.data.session?.user.id ?? null,
+        accessPreview: tokenPreview(cur.data.session?.access_token ?? null),
+      });
+      const u = await c.auth.getUser();
+      pushDebug("seed.getUser", {
+        uid: u.data.user?.id ?? null,
+        email: u.data.user?.email ?? null,
+        error: u.error?.message ?? null,
+      });
+    })();
+    // pushDebug intentionally not in deps — debugMode/setDebugLog stable for the lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAccessToken, initialRefreshToken]);
 
   // Auto-dismiss do banner de sucesso
@@ -140,14 +202,25 @@ export function PontoApp({
       //   3) setSession() com os tokens passados pelo server na primeira render
       const browserClient = getBrowserClient();
       if (!browserClient) {
+        pushDebug("punch.abort", "no browser client");
         setError("Supabase indisponível");
         return;
       }
 
       let session = (await browserClient.auth.getSession()).data.session;
+      pushDebug("punch.getSession", {
+        ok: !!session,
+        userId: session?.user.id ?? null,
+        accessPreview: tokenPreview(session?.access_token ?? null),
+      });
       if (!session) {
         const refreshed = await browserClient.auth.refreshSession();
         session = refreshed.data.session ?? null;
+        pushDebug("punch.refreshSession", {
+          ok: !!session,
+          userId: session?.user.id ?? null,
+          error: refreshed.error?.message ?? null,
+        });
       }
       if (!session && initialAccessToken && initialRefreshToken) {
         const set = await browserClient.auth.setSession({
@@ -155,26 +228,55 @@ export function PontoApp({
           refresh_token: initialRefreshToken,
         });
         session = set.data.session ?? null;
+        pushDebug("punch.setSessionFallback", {
+          ok: !!session,
+          userId: session?.user.id ?? null,
+          error: set.error?.message ?? null,
+        });
       }
       if (!session) {
+        pushDebug("punch.abort", "no session after cascade");
         setError(
           "Sua sessão expirou. Toque pra recarregar e fazer login novamente.",
         );
         return;
       }
 
+      const u = await browserClient.auth.getUser();
+      pushDebug("punch.getUser", {
+        uid: u.data.user?.id ?? null,
+        email: u.data.user?.email ?? null,
+        error: u.error?.message ?? null,
+      });
+
+      const payload = {
+        employee_id: employeeId,
+        tipo: next,
+        latitude: lat,
+        longitude: lng,
+        device_info: deviceInfo,
+        timestamp_punch: new Date().toISOString(),
+      };
+      pushDebug("punch.payload", payload);
+
       const { data: inserted, error: insErr } = await browserClient
         .from("time_clock_punches")
-        .insert({
-          employee_id: employeeId,
-          tipo: next,
-          latitude: lat,
-          longitude: lng,
-          device_info: deviceInfo,
-          timestamp_punch: new Date().toISOString(),
-        } as never)
+        .insert(payload as never)
         .select()
         .single();
+
+      pushDebug("punch.insert", {
+        ok: !!inserted && !insErr,
+        data: inserted ? { id: (inserted as { id: string }).id } : null,
+        error: insErr
+          ? {
+              code: insErr.code,
+              message: insErr.message,
+              details: insErr.details,
+              hint: insErr.hint,
+            }
+          : null,
+      });
 
       if (insErr || !inserted) {
         setError(insErr?.message ?? "Falha ao registrar ponto");
@@ -214,6 +316,19 @@ export function PontoApp({
       <Timeline punches={punches} />
 
       <SignOutFooter />
+
+      {debugMode && (
+        <DebugPanel
+          log={debugLog}
+          context={{
+            employeeId,
+            employeeName,
+            hasInitialAccessToken: !!initialAccessToken,
+            hasInitialRefreshToken: !!initialRefreshToken,
+            initialAccessPreview: tokenPreview(initialAccessToken),
+          }}
+        />
+      )}
 
       {showCamera && (
         <CameraCapture
@@ -619,6 +734,117 @@ function SignOutFooter() {
     >
       Sair
     </Link>
+  );
+}
+
+/**
+ * Painel de diagnóstico — só renderiza com ?debug=1 na URL.
+ * Mostra o ciclo completo: tokens vindos do server → setSession →
+ * getUser → insert. Inclui server-side debug via /api/ponto/debug.
+ * Estilo dourado mono pra ficar fácil de ler em print de mobile.
+ */
+function DebugPanel({
+  log,
+  context,
+}: {
+  log: DebugLine[];
+  context: Record<string, unknown>;
+}) {
+  const [serverDebug, setServerDebug] = useState<unknown>(null);
+  const [serverErr, setServerErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchServer = async () => {
+    setLoading(true);
+    setServerErr(null);
+    try {
+      const r = await fetch("/api/ponto/debug", { credentials: "include" });
+      const j = await r.json();
+      setServerDebug({ status: r.status, body: j });
+    } catch (e) {
+      setServerErr(e instanceof Error ? e.message : "fetch failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 18,
+        padding: "14px 16px",
+        background: "#1A1208",
+        border: "1px solid #D4A574",
+        borderRadius: 12,
+        fontFamily: "var(--font-geist-mono, monospace)",
+        fontSize: 10,
+        color: "#D4A574",
+        lineHeight: 1.45,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-all",
+      }}
+    >
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.4, marginBottom: 8 }}>
+        ⚙ DEBUG · ?debug=1
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ opacity: 0.7 }}>context:</div>
+        <pre style={{ margin: "2px 0 0", fontSize: 10 }}>
+          {JSON.stringify(context, null, 2)}
+        </pre>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ opacity: 0.7 }}>client log ({log.length}):</div>
+        {log.length === 0 ? (
+          <div style={{ opacity: 0.5 }}>(empty — toca o botão pra registrar punch)</div>
+        ) : (
+          log.map((l, i) => (
+            <div key={i} style={{ marginTop: 4 }}>
+              <span style={{ opacity: 0.5 }}>{l.ts}</span>{" "}
+              <span style={{ color: "#FFD180" }}>{l.tag}</span>
+              <pre style={{ margin: "2px 0 0", fontSize: 10 }}>
+                {typeof l.data === "string"
+                  ? l.data
+                  : JSON.stringify(l.data, null, 2)}
+              </pre>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button
+        onClick={fetchServer}
+        disabled={loading}
+        style={{
+          padding: "6px 10px",
+          background: "#D4A574",
+          color: "#1A1208",
+          border: "none",
+          borderRadius: 6,
+          fontSize: 10,
+          fontWeight: 700,
+          fontFamily: "inherit",
+          cursor: "pointer",
+          marginBottom: 8,
+        }}
+      >
+        {loading ? "carregando…" : "GET /api/ponto/debug"}
+      </button>
+
+      {serverErr && (
+        <div style={{ color: "#FF6B6B" }}>server fetch error: {serverErr}</div>
+      )}
+      {serverDebug !== null && (
+        <div>
+          <div style={{ opacity: 0.7 }}>server response:</div>
+          <pre style={{ margin: "2px 0 0", fontSize: 10 }}>
+            {JSON.stringify(serverDebug, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
   );
 }
 
