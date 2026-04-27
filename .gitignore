@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ETL output (contém CPFs reais — PII)
+scripts/etl-output.json
+scripts/_*.ts
