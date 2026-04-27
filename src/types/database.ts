@@ -193,6 +193,27 @@ export type Database = {
           sobrenome: string;
           cpf: string | null;
           ctps: string | null;
+          ctps_serie: string | null;
+          ctps_uf: string | null;
+          rg: string | null;
+          rg_orgao: string | null;
+          rg_uf: string | null;
+          pis: string | null;
+          titulo_eleitor: string | null;
+          reservista: string | null;
+          rua: string | null;
+          numero: string | null;
+          complemento: string | null;
+          bairro: string | null;
+          cidade: string | null;
+          estado: string | null;
+          cep: string | null;
+          escolaridade: string | null;
+          raca: string | null;
+          genero: string | null;
+          nome_mae: string | null;
+          nome_pai: string | null;
+          departamento: string | null;
           funcao: string;
           salario_base: string;
           data_admissao: string;
@@ -214,6 +235,27 @@ export type Database = {
           sobrenome: string;
           cpf?: string | null;
           ctps?: string | null;
+          ctps_serie?: string | null;
+          ctps_uf?: string | null;
+          rg?: string | null;
+          rg_orgao?: string | null;
+          rg_uf?: string | null;
+          pis?: string | null;
+          titulo_eleitor?: string | null;
+          reservista?: string | null;
+          rua?: string | null;
+          numero?: string | null;
+          complemento?: string | null;
+          bairro?: string | null;
+          cidade?: string | null;
+          estado?: string | null;
+          cep?: string | null;
+          escolaridade?: string | null;
+          raca?: string | null;
+          genero?: string | null;
+          nome_mae?: string | null;
+          nome_pai?: string | null;
+          departamento?: string | null;
           funcao: string;
           salario_base?: string | number;
           data_admissao: string;
@@ -235,6 +277,27 @@ export type Database = {
           sobrenome?: string;
           cpf?: string | null;
           ctps?: string | null;
+          ctps_serie?: string | null;
+          ctps_uf?: string | null;
+          rg?: string | null;
+          rg_orgao?: string | null;
+          rg_uf?: string | null;
+          pis?: string | null;
+          titulo_eleitor?: string | null;
+          reservista?: string | null;
+          rua?: string | null;
+          numero?: string | null;
+          complemento?: string | null;
+          bairro?: string | null;
+          cidade?: string | null;
+          estado?: string | null;
+          cep?: string | null;
+          escolaridade?: string | null;
+          raca?: string | null;
+          genero?: string | null;
+          nome_mae?: string | null;
+          nome_pai?: string | null;
+          departamento?: string | null;
           funcao?: string;
           salario_base?: string | number;
           data_admissao?: string;
@@ -328,6 +391,8 @@ export type Database = {
           employee_id: string;
           saldo_minutos: number;
           ultimo_calculo: string | null;
+          source: string | null;
+          observacao: string | null;
           updated_at: string;
         };
         Insert: {
@@ -335,6 +400,8 @@ export type Database = {
           employee_id: string;
           saldo_minutos?: number;
           ultimo_calculo?: string | null;
+          source?: string | null;
+          observacao?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -342,7 +409,134 @@ export type Database = {
           employee_id?: string;
           saldo_minutos?: number;
           ultimo_calculo?: string | null;
+          source?: string | null;
+          observacao?: string | null;
           updated_at?: string;
+        };
+      };
+      dependents: {
+        Row: {
+          id: string;
+          employee_id: string;
+          nome: string;
+          cpf: string | null;
+          data_nascimento: string | null;
+          parentesco: string;
+          ordem: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          nome: string;
+          cpf?: string | null;
+          data_nascimento?: string | null;
+          parentesco: string;
+          ordem?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          nome?: string;
+          cpf?: string | null;
+          data_nascimento?: string | null;
+          parentesco?: string;
+          ordem?: number;
+          created_at?: string;
+        };
+      };
+      absences: {
+        Row: {
+          id: string;
+          employee_id: string;
+          data: string;
+          tipo: string;
+          motivo: string | null;
+          score_impact: number;
+          atestado_path: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          data: string;
+          tipo: string;
+          motivo?: string | null;
+          score_impact?: number;
+          atestado_path?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          data?: string;
+          tipo?: string;
+          motivo?: string | null;
+          score_impact?: number;
+          atestado_path?: string | null;
+          created_at?: string;
+        };
+      };
+      warnings: {
+        Row: {
+          id: string;
+          employee_id: string;
+          nivel: string;
+          descricao: string;
+          score_impact: number;
+          documento_path: string | null;
+          data: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          nivel: string;
+          descricao: string;
+          score_impact?: number;
+          documento_path?: string | null;
+          data?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          nivel?: string;
+          descricao?: string;
+          score_impact?: number;
+          documento_path?: string | null;
+          data?: string;
+          created_at?: string;
+        };
+      };
+      score_events: {
+        Row: {
+          id: string;
+          employee_id: string;
+          tipo: string;
+          delta: number;
+          descricao: string | null;
+          referencia_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          tipo: string;
+          delta: number;
+          descricao?: string | null;
+          referencia_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          tipo?: string;
+          delta?: number;
+          descricao?: string | null;
+          referencia_id?: string | null;
+          created_at?: string;
         };
       };
       payslips: {

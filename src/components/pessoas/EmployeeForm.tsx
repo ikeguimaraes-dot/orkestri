@@ -28,10 +28,24 @@ type Props =
   | { mode: "create"; unitId: string; defaultValues?: undefined; employeeId?: undefined }
   | { mode: "edit"; unitId: string; employeeId: string; defaultValues: EmployeeFormInput };
 
+const ESCOLARIDADE_OPTIONS = [
+  "Fundamental Incompleto",
+  "Fundamental Completo",
+  "Médio Incompleto",
+  "Médio Completo",
+  "Superior Incompleto",
+  "Superior Completo",
+  "Pós-graduação",
+] as const;
+
+const RACA_OPTIONS = ["Branca", "Preta", "Parda", "Amarela", "Indígena", "Não declarada"] as const;
+const GENERO_OPTIONS = ["Masculino", "Feminino", "Outro", "Não declarado"] as const;
+
 export function EmployeeForm(props: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [cepLoading, setCepLoading] = useState(false);
 
   // RHF: TFieldValues = input (o que o user digita), TTransformedValues = output
   // (depois do schema transform com nulls). Sem isso, o tipo do resolver não bate.
@@ -44,10 +58,31 @@ export function EmployeeForm(props: Props) {
             nome: "",
             sobrenome: "",
             funcao: "",
-            salario_base: "" as unknown as number, // input vazio até user digitar
+            salario_base: "" as unknown as number,
             data_admissao: "",
             cpf: "",
+            rg: "",
+            rg_orgao: "",
+            rg_uf: "",
+            pis: "",
             ctps: "",
+            ctps_serie: "",
+            ctps_uf: "",
+            titulo_eleitor: "",
+            reservista: "",
+            cep: "",
+            rua: "",
+            numero: "",
+            complemento: "",
+            bairro: "",
+            cidade: "",
+            estado: "",
+            escolaridade: "",
+            raca: "",
+            genero: "",
+            nome_mae: "",
+            nome_pai: "",
+            departamento: "",
             banco: "",
             agencia: "",
             conta: "",
@@ -56,7 +91,41 @@ export function EmployeeForm(props: Props) {
           },
   });
 
-  // handleSubmit recebe o OUTPUT do schema (com transforms aplicadas).
+  // ViaCEP: ao perder foco do CEP, busca e preenche endereço.
+  const handleCepBlur = async (rawCep: string) => {
+    const cep = rawCep.replace(/\D/g, "");
+    if (cep.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      if (!res.ok) return;
+      const data: {
+        logradouro?: string;
+        bairro?: string;
+        localidade?: string;
+        uf?: string;
+        erro?: boolean;
+      } = await res.json();
+      if (data.erro) return;
+      // Só sobrescreve campos vazios — não pisa em edição manual.
+      const setIfEmpty = (k: keyof EmployeeFormInput, v: string | undefined) => {
+        if (!v) return;
+        const curr = form.getValues(k);
+        if (curr === undefined || curr === null || curr === "") {
+          form.setValue(k, v as never, { shouldValidate: true, shouldDirty: true });
+        }
+      };
+      setIfEmpty("rua", data.logradouro);
+      setIfEmpty("bairro", data.bairro);
+      setIfEmpty("cidade", data.localidade);
+      setIfEmpty("estado", data.uf);
+    } catch (e) {
+      console.warn("[ViaCEP] falha:", e);
+    } finally {
+      setCepLoading(false);
+    }
+  };
+
   const onSubmit = (parsed: EmployeeFormOutput) => {
     setSubmitError(null);
     startTransition(async () => {
@@ -78,7 +147,7 @@ export function EmployeeForm(props: Props) {
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit)}
-      style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 720 }}
+      style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 820 }}
     >
       <Section title="Identificação" desc="Dados pessoais e função na casa.">
         <Row>
@@ -91,18 +160,18 @@ export function EmployeeForm(props: Props) {
         </Row>
         <Row>
           <Field label="Função" error={errs.funcao?.message}>
-            <Input {...form.register("funcao")} placeholder="Ex: Garçonete, Cozinheiro" />
+            <Input {...form.register("funcao")} placeholder="Ex: Garçom I, Cozinheiro II" />
           </Field>
           <Field label="CPF (opcional)" error={errs.cpf?.message}>
             <Input {...form.register("cpf")} placeholder="000.000.000-00" />
           </Field>
         </Row>
-        <Field label="CTPS (opcional)" error={errs.ctps?.message}>
-          <Input {...form.register("ctps")} placeholder="Número/série" />
-        </Field>
       </Section>
 
-      <Section title="Vínculo e remuneração" desc="Salário-base é o de carteira (sem horas extras / gorjeta).">
+      <Section
+        title="Vínculo e remuneração"
+        desc="Salário-base é o de carteira (sem horas extras / gorjeta)."
+      >
         <Row>
           <Field label="Salário-base (R$)" error={errs.salario_base?.message}>
             <Input
@@ -117,9 +186,177 @@ export function EmployeeForm(props: Props) {
             <Input type="date" {...form.register("data_admissao")} />
           </Field>
         </Row>
+        <Field label="Departamento" error={errs.departamento?.message}>
+          <Input
+            {...form.register("departamento")}
+            placeholder="Ex: COZINHA, SALAO, ADMINISTRATIVO"
+          />
+        </Field>
       </Section>
 
-      <Section title="Dados bancários" desc="Opcionais. Preenche quando tiver os dados; não bloqueia o cadastro.">
+      <Section title="Documentos" desc="Não bloqueia o cadastro. Preenche conforme tiver.">
+        <Row>
+          <Field label="RG" error={errs.rg?.message}>
+            <Input {...form.register("rg")} />
+          </Field>
+          <Field label="Órgão emissor" error={errs.rg_orgao?.message}>
+            <Input {...form.register("rg_orgao")} placeholder="SSP" />
+          </Field>
+          <Field label="UF" error={errs.rg_uf?.message}>
+            <Input {...form.register("rg_uf")} maxLength={2} placeholder="SP" />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="PIS / NIS" error={errs.pis?.message}>
+            <Input {...form.register("pis")} />
+          </Field>
+          <Field label="CTPS número" error={errs.ctps?.message}>
+            <Input {...form.register("ctps")} />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="CTPS série" error={errs.ctps_serie?.message}>
+            <Input {...form.register("ctps_serie")} />
+          </Field>
+          <Field label="CTPS UF" error={errs.ctps_uf?.message}>
+            <Input {...form.register("ctps_uf")} maxLength={2} />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="Título de eleitor" error={errs.titulo_eleitor?.message}>
+            <Input {...form.register("titulo_eleitor")} />
+          </Field>
+          <Field label="Reservista" error={errs.reservista?.message}>
+            <Input {...form.register("reservista")} />
+          </Field>
+        </Row>
+      </Section>
+
+      <Section
+        title="Endereço"
+        desc="Digite o CEP e o resto preenche automático (ViaCEP)."
+      >
+        <Row>
+          <Field
+            label={cepLoading ? "CEP (buscando…)" : "CEP"}
+            error={errs.cep?.message}
+          >
+            <Input
+              {...form.register("cep", {
+                onBlur: (e) => handleCepBlur(e.target.value),
+              })}
+              placeholder="00000-000"
+              maxLength={9}
+            />
+          </Field>
+          <Field label="Estado" error={errs.estado?.message}>
+            <Input {...form.register("estado")} maxLength={2} placeholder="SP" />
+          </Field>
+        </Row>
+        <Field label="Rua / Logradouro" error={errs.rua?.message}>
+          <Input {...form.register("rua")} />
+        </Field>
+        <Row>
+          <Field label="Número" error={errs.numero?.message}>
+            <Input {...form.register("numero")} />
+          </Field>
+          <Field label="Complemento" error={errs.complemento?.message}>
+            <Input {...form.register("complemento")} placeholder="Apto, casa, fundos…" />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="Bairro" error={errs.bairro?.message}>
+            <Input {...form.register("bairro")} />
+          </Field>
+          <Field label="Cidade" error={errs.cidade?.message}>
+            <Input {...form.register("cidade")} />
+          </Field>
+        </Row>
+      </Section>
+
+      <Section
+        title="Informações adicionais"
+        desc="Dados sociodemográficos exigidos pelo eSocial / RAIS."
+      >
+        <Row>
+          <Field label="Escolaridade" error={errs.escolaridade?.message}>
+            <Select
+              value={form.watch("escolaridade") ?? ""}
+              onValueChange={(v) =>
+                form.setValue("escolaridade", v as EmployeeFormInput["escolaridade"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent>
+                {ESCOLARIDADE_OPTIONS.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Raça/Cor" error={errs.raca?.message}>
+            <Select
+              value={form.watch("raca") ?? ""}
+              onValueChange={(v) =>
+                form.setValue("raca", v as EmployeeFormInput["raca"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent>
+                {RACA_OPTIONS.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Gênero" error={errs.genero?.message}>
+            <Select
+              value={form.watch("genero") ?? ""}
+              onValueChange={(v) =>
+                form.setValue("genero", v as EmployeeFormInput["genero"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent>
+                {GENERO_OPTIONS.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </Row>
+        <Row>
+          <Field label="Nome da mãe" error={errs.nome_mae?.message}>
+            <Input {...form.register("nome_mae")} autoComplete="off" />
+          </Field>
+          <Field label="Nome do pai" error={errs.nome_pai?.message}>
+            <Input {...form.register("nome_pai")} autoComplete="off" />
+          </Field>
+        </Row>
+      </Section>
+
+      <Section
+        title="Dados bancários"
+        desc="Opcionais. Preenche quando tiver os dados; não bloqueia o cadastro."
+      >
         <Row>
           <Field label="Banco" error={errs.banco?.message}>
             <Input {...form.register("banco")} placeholder="Ex: Itaú" />
@@ -182,7 +419,13 @@ export function EmployeeForm(props: Props) {
           Cancelar
         </Button>
         <Button type="submit" disabled={pending}>
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : props.mode === "create" ? "Criar colaborador" : "Salvar alterações"}
+          {pending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : props.mode === "create" ? (
+            "Criar colaborador"
+          ) : (
+            "Salvar alterações"
+          )}
         </Button>
       </div>
     </form>
@@ -229,7 +472,7 @@ function Row({ children }: { children: React.ReactNode }) {
       style={{
         display: "grid",
         gap: 14,
-        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
       }}
     >
       {children}
@@ -266,7 +509,28 @@ export function employeeToFormDefaults(e: Employee): EmployeeFormInput {
     salario_base: Number(e.salario_base) as unknown as number,
     data_admissao: e.data_admissao.slice(0, 10),
     cpf: e.cpf ?? "",
+    rg: e.rg ?? "",
+    rg_orgao: e.rg_orgao ?? "",
+    rg_uf: e.rg_uf ?? "",
+    pis: e.pis ?? "",
     ctps: e.ctps ?? "",
+    ctps_serie: e.ctps_serie ?? "",
+    ctps_uf: e.ctps_uf ?? "",
+    titulo_eleitor: e.titulo_eleitor ?? "",
+    reservista: e.reservista ?? "",
+    cep: e.cep ?? "",
+    rua: e.rua ?? "",
+    numero: e.numero ?? "",
+    complemento: e.complemento ?? "",
+    bairro: e.bairro ?? "",
+    cidade: e.cidade ?? "",
+    estado: e.estado ?? "",
+    escolaridade: e.escolaridade ?? "",
+    raca: e.raca ?? "",
+    genero: e.genero ?? "",
+    nome_mae: e.nome_mae ?? "",
+    nome_pai: e.nome_pai ?? "",
+    departamento: e.departamento ?? "",
     banco: e.banco ?? "",
     agencia: e.agencia ?? "",
     conta: e.conta ?? "",

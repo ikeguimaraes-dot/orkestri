@@ -22,6 +22,27 @@ export type Employee = {
   sobrenome: string;
   cpf: string | null;
   ctps: string | null;
+  ctps_serie: string | null;
+  ctps_uf: string | null;
+  rg: string | null;
+  rg_orgao: string | null;
+  rg_uf: string | null;
+  pis: string | null;
+  titulo_eleitor: string | null;
+  reservista: string | null;
+  rua: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  escolaridade: string | null;
+  raca: string | null;
+  genero: string | null;
+  nome_mae: string | null;
+  nome_pai: string | null;
+  departamento: string | null;
   funcao: string;
   salario_base: string;          // NUMERIC(10,2)
   data_admissao: string;         // ISO date
@@ -44,6 +65,27 @@ export type EmployeeInsert = {
   sobrenome: string;
   cpf?: string | null;
   ctps?: string | null;
+  ctps_serie?: string | null;
+  ctps_uf?: string | null;
+  rg?: string | null;
+  rg_orgao?: string | null;
+  rg_uf?: string | null;
+  pis?: string | null;
+  titulo_eleitor?: string | null;
+  reservista?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
+  escolaridade?: string | null;
+  raca?: string | null;
+  genero?: string | null;
+  nome_mae?: string | null;
+  nome_pai?: string | null;
+  departamento?: string | null;
   funcao: string;
   salario_base?: string | number;
   data_admissao: string;
@@ -57,6 +99,107 @@ export type EmployeeInsert = {
 };
 
 export type EmployeeUpdate = Partial<Omit<EmployeeInsert, "unit_id">>;
+
+// ── Dependentes (IRRF) ─────────────────────────────────────────
+export type Dependent = {
+  id: string;
+  employee_id: string;
+  nome: string;
+  cpf: string | null;
+  data_nascimento: string | null;
+  parentesco: string;
+  ordem: number;
+  created_at: string;
+};
+
+export type DependentInsert = {
+  id?: string;
+  employee_id: string;
+  nome: string;
+  cpf?: string | null;
+  data_nascimento?: string | null;
+  parentesco: string;
+  ordem?: number;
+};
+
+export type DependentUpdate = Partial<Omit<DependentInsert, "employee_id">>;
+
+// ── Faltas / atestados ─────────────────────────────────────────
+export type AbsenceTipo =
+  | "justificada"
+  | "injustificada"
+  | "atestado"
+  | "falta_abono"
+  | string;
+
+export type Absence = {
+  id: string;
+  employee_id: string;
+  data: string;
+  tipo: AbsenceTipo;
+  motivo: string | null;
+  score_impact: number;
+  atestado_path: string | null;
+  created_at: string;
+};
+
+export type AbsenceInsert = {
+  id?: string;
+  employee_id: string;
+  data: string;
+  tipo: AbsenceTipo;
+  motivo?: string | null;
+  score_impact?: number;
+  atestado_path?: string | null;
+};
+
+export type AbsenceUpdate = Partial<Omit<AbsenceInsert, "employee_id">>;
+
+// ── Advertências (CLT) ─────────────────────────────────────────
+export type WarningNivel = "verbal" | "escrita" | "suspensao" | string;
+
+export type Warning = {
+  id: string;
+  employee_id: string;
+  nivel: WarningNivel;
+  descricao: string;
+  score_impact: number;
+  documento_path: string | null;
+  data: string;
+  created_at: string;
+};
+
+export type WarningInsert = {
+  id?: string;
+  employee_id: string;
+  nivel: WarningNivel;
+  descricao: string;
+  score_impact?: number;
+  documento_path?: string | null;
+  data?: string;
+};
+
+export type WarningUpdate = Partial<Omit<WarningInsert, "employee_id">>;
+
+// ── Score / gamificação RH ─────────────────────────────────────
+export type ScoreEvent = {
+  id: string;
+  employee_id: string;
+  tipo: string;
+  delta: number;
+  descricao: string | null;
+  referencia_id: string | null;
+  created_at: string;
+};
+
+export type ScoreEventInsert = {
+  id?: string;
+  employee_id: string;
+  tipo: string;
+  delta: number;
+  descricao?: string | null;
+  referencia_id?: string | null;
+};
 
 export type Shift = {
   id: string;
