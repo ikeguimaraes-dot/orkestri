@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  CalendarClock, Clock3, Receipt, UserCog, ArrowUpRight,
+  CalendarClock, Clock3, Receipt, ShieldAlert, UserCog, ArrowUpRight,
   type LucideIcon,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/server";
@@ -15,31 +15,38 @@ type SubModule = {
 
 const SUB_MODULES: ReadonlyArray<SubModule> = [
   {
+    href: "/pessoas/colaboradores",
+    label: "Colaboradores",
+    desc: "Cadastro completo eSocial: CPF, RG, PIS, CTPS, endereço, dependentes.",
+    icon: UserCog,
+    status: "ativo",
+  },
+  {
     href: "/pessoas/escala",
     label: "Escala",
     desc: "Drag-and-drop denso, labor cost realtime ao mover turno.",
     icon: CalendarClock,
-    status: "em-construcao",
-  },
-  {
-    href: "/pessoas/ponto",
-    label: "Ponto",
-    desc: "PWA com câmera + geolocalização. Aprovação pelo gerente.",
-    icon: Clock3,
-    status: "em-construcao",
+    status: "ativo",
   },
   {
     href: "/pessoas/holerites",
     label: "Holerites",
     desc: "Cálculo CLT + Sinthoresp + DSR sobre gorjeta. PDF on-demand.",
     icon: Receipt,
-    status: "em-construcao",
+    status: "ativo",
   },
   {
-    href: "/pessoas/colaboradores",
-    label: "Colaboradores",
-    desc: "Cadastro completo. CPF, CTPS, função, banco, salário-base.",
-    icon: UserCog,
+    href: "/pessoas/disciplina",
+    label: "Score & Disciplina",
+    desc: "Advertências verbal/escrita/suspensão + faltas tipadas + score gamificado.",
+    icon: ShieldAlert,
+    status: "ativo",
+  },
+  {
+    href: "/pessoas/ponto",
+    label: "Ponto",
+    desc: "PWA com câmera + geolocalização. Aprovação pelo gerente.",
+    icon: Clock3,
     status: "em-construcao",
   },
 ];

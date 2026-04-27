@@ -4,9 +4,10 @@ import { Plus, UserPlus } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { EmployeeTable } from "@/components/pessoas/EmployeeTable";
-import { listEmployees } from "@/lib/pessoas/actions";
+import { listEmployees, listEmployeeScores } from "@/lib/pessoas/actions";
 import { requireUser } from "@/lib/auth/server";
 import { getCurrentUnit } from "@/lib/auth/unit";
+import type { EmployeeScore } from "@/types/pessoas";
 
 export const dynamic = "force-dynamic";
 
@@ -67,10 +68,16 @@ async function EmployeeListSection() {
   if (!unit) {
     return <NoUnitState />;
   }
-  const employees = await listEmployees(unit.id);
+  const [employees, scores] = await Promise.all([
+    listEmployees(unit.id),
+    listEmployeeScores(unit.id),
+  ]);
   if (employees.length === 0) {
     return <EmptyState unitName={unit.name} />;
   }
+  // Map empId → score (consumido pela tabela cliente)
+  const scoreMap: Record<string, EmployeeScore> = {};
+  for (const s of scores) scoreMap[s.employee.id] = s;
   return (
     <>
       <p
@@ -84,7 +91,7 @@ async function EmployeeListSection() {
         <span style={{ color: "var(--text)", fontWeight: 600 }}>{unit.name}</span> —
         {" "}{employees.length} {employees.length === 1 ? "colaborador" : "colaboradores"} no total.
       </p>
-      <EmployeeTable data={employees} />
+      <EmployeeTable data={employees} scores={scoreMap} />
     </>
   );
 }

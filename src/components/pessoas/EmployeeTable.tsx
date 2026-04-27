@@ -42,12 +42,19 @@ import {
 } from "@/components/ui/table";
 
 import { deactivateEmployee } from "@/lib/pessoas/actions";
+import { ScoreDot } from "@/components/pessoas/ScoreBar";
 import { avatarColor, formatBRL, formatDateBR, initials } from "@/lib/format";
-import type { Employee } from "@/types/pessoas";
+import type { Employee, EmployeeScore } from "@/types/pessoas";
 
 const PAGE_SIZE = 10;
 
-export function EmployeeTable({ data }: { data: Employee[] }) {
+export function EmployeeTable({
+  data,
+  scores,
+}: {
+  data: Employee[];
+  scores?: Record<string, EmployeeScore>;
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -86,11 +93,28 @@ export function EmployeeTable({ data }: { data: Employee[] }) {
         cell: ({ row }) => {
           const e = row.original;
           const fullName = `${e.nome} ${e.sobrenome}`.trim();
+          const s = scores?.[e.id];
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Avatar name={fullName} />
               <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                  }}
+                >
+                  {s && (
+                    <ScoreDot
+                      score={s.score}
+                      warnings={s.warnings_count}
+                      absences={s.absences_count}
+                    />
+                  )}
                   {fullName}
                 </span>
                 {e.cpf && (
@@ -232,7 +256,7 @@ export function EmployeeTable({ data }: { data: Employee[] }) {
         },
       },
     ],
-    [router, startTransition],
+    [router, startTransition, scores],
   );
 
   const table = useReactTable({

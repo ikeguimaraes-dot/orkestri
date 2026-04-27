@@ -201,6 +201,22 @@ export type ScoreEventInsert = {
   referencia_id?: string | null;
 };
 
+// Joined types pra listagens de Disciplina.
+export type EmployeeStub = Pick<
+  Employee,
+  "id" | "nome" | "sobrenome" | "funcao" | "departamento"
+>;
+
+export type WarningWithEmployee = Warning & { employee: EmployeeStub | null };
+export type AbsenceWithEmployee = Absence & { employee: EmployeeStub | null };
+
+export type EmployeeScore = {
+  employee: EmployeeStub & { ativo: boolean };
+  score: number;
+  warnings_count: number;
+  absences_count: number;
+};
+
 export type Shift = {
   id: string;
   employee_id: string;

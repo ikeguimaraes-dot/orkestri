@@ -5,21 +5,36 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/result";
 import { gerarHolerite } from "@/lib/pessoas/clt";
 import type {
+  Absence,
+  AbsenceInsert,
+  AbsenceTipo,
+  AbsenceWithEmployee,
   Employee,
   EmployeeInsert,
+  EmployeeScore,
+  EmployeeStub,
   EmployeeUpdate,
   GeneratePayslipInput,
   Payslip,
   PayslipStatus,
   PayslipWithEmployee,
+  ScoreEvent,
   Shift,
   ShiftInsert,
   ShiftUpdate,
+  Warning,
+  WarningInsert,
+  WarningNivel,
+  WarningWithEmployee,
 } from "@/types/pessoas";
+import { deltaForAbsence, deltaForWarning, calcScore } from "@/lib/pessoas/score";
 
 const TABLE = "employees" as const;
 const SHIFTS_TABLE = "shifts" as const;
 const PAYSLIPS_TABLE = "payslips" as const;
+const WARNINGS_TABLE = "warnings" as const;
+const ABSENCES_TABLE = "absences" as const;
+const SCORE_EVENTS_TABLE = "score_events" as const;
 
 // Nota: o builder do @supabase/ssr infere `never` em insert/update quando
 // PostgrestVersion 12 + custom Database<T>. As entradas já estão validadas
@@ -488,4 +503,288 @@ export async function approvePayslip(id: string): Promise<ActionResult<Payslip>>
 
 export async function markPayslipPaid(id: string): Promise<ActionResult<Payslip>> {
   return setPayslipStatus(id, "pago");
+}
+
+// ── Disciplina: warnings, absences, score ──────────────────────
+
+type WarningJoinRow = Warning & {
+  employees: EmployeeStub | EmployeeStub[] | null;
+};
+type AbsenceJoinRow = Absence & {
+  employees: EmployeeStub | EmployeeStub[] | null;
+};
+
+function unwrapEmployee(
+  e: EmployeeStub | EmployeeStub[] | null | undefined,
+): EmployeeStub | null {
+  if (!e) return null;
+  return Array.isArray(e) ? (e[0] ?? null) : e;
+}
+
+/** Lista advertências da unit. RLS já filtra por employees.unit_id. */
+export async function listWarnings(unitId: string): Promise<WarningWithEmployee[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from(WARNINGS_TABLE)
+      .select("*, employees!inner(id, nome, sobrenome, funcao, departamento, unit_id)")
+      .eq("employees.unit_id", unitId)
+      .order("data", { ascending: false })
+      .returns<WarningJoinRow[]>();
+    if (error) {
+      console.error("[listWarnings] error:", error.message);
+      return [];
+    }
+    return (data ?? []).map((row) => ({
+      ...row,
+      employee: unwrapEmployee(row.employees),
+    })) as WarningWithEmployee[];
+  } catch (e) {
+    console.error("[listWarnings] exceção:", e);
+    return [];
+  }
+}
+
+export async function getWarning(id: string): Promise<WarningWithEmployee | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from(WARNINGS_TABLE)
+      .select("*, employees!inner(id, nome, sobrenome, funcao, departamento, unit_id)")
+      .eq("id", id)
+      .maybeSingle<WarningJoinRow>();
+    if (error || !data) return null;
+    return { ...data, employee: unwrapEmployee(data.employees) } as WarningWithEmployee;
+  } catch (e) {
+    console.error("[getWarning] exceção:", e);
+    return null;
+  }
+}
+
+/**
+ * Cria advertência + score_event automático.
+ * Ignora `score_impact` no input — derivado de WARNING_DELTA pelo nível.
+ */
+export async function createWarning(
+  input: Omit<WarningInsert, "score_impact">,
+): Promise<ActionResult<Warning>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const delta = deltaForWarning(input.nivel as WarningNivel);
+    const payload = {
+      ...input,
+      score_impact: delta,
+      data: input.data ?? new Date().toISOString().slice(0, 10),
+    };
+
+    const { data, error } = await supabase
+      .from(WARNINGS_TABLE)
+      .insert(payload as never)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao criar advertência" };
+    }
+    const warning = data as Warning;
+
+    // Score event vinculado.
+    if (delta !== 0) {
+      await supabase.from(SCORE_EVENTS_TABLE).insert({
+        employee_id: input.employee_id,
+        tipo: `warning_${input.nivel}`,
+        delta,
+        descricao: input.descricao,
+        referencia_id: warning.id,
+      } as never);
+    }
+
+    revalidatePath("/pessoas/disciplina");
+    revalidatePath("/pessoas/colaboradores");
+    return { ok: true, data: warning };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+/** Lista faltas da unit. Filtra por mês/ano se ambos vierem. */
+export async function listAbsences(
+  unitId: string,
+  mes?: number,
+  ano?: number,
+): Promise<AbsenceWithEmployee[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    let query = supabase
+      .from(ABSENCES_TABLE)
+      .select("*, employees!inner(id, nome, sobrenome, funcao, departamento, unit_id)")
+      .eq("employees.unit_id", unitId)
+      .order("data", { ascending: false });
+    if (mes && ano) {
+      const start = `${ano}-${String(mes).padStart(2, "0")}-01`;
+      const lastDay = new Date(ano, mes, 0).getDate();
+      const end = `${ano}-${String(mes).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      query = query.gte("data", start).lte("data", end);
+    }
+    const { data, error } = await query.returns<AbsenceJoinRow[]>();
+    if (error) {
+      console.error("[listAbsences] error:", error.message);
+      return [];
+    }
+    return (data ?? []).map((row) => ({
+      ...row,
+      employee: unwrapEmployee(row.employees),
+    })) as AbsenceWithEmployee[];
+  } catch (e) {
+    console.error("[listAbsences] exceção:", e);
+    return [];
+  }
+}
+
+/** Cria falta + score_event automático (apenas se delta !== 0). */
+export async function createAbsence(
+  input: Omit<AbsenceInsert, "score_impact">,
+): Promise<ActionResult<Absence>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const delta = deltaForAbsence(input.tipo as AbsenceTipo);
+    const payload = { ...input, score_impact: delta };
+
+    const { data, error } = await supabase
+      .from(ABSENCES_TABLE)
+      .insert(payload as never)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao criar falta" };
+    }
+    const absence = data as Absence;
+
+    if (delta !== 0) {
+      await supabase.from(SCORE_EVENTS_TABLE).insert({
+        employee_id: input.employee_id,
+        tipo: `absence_${input.tipo}`,
+        delta,
+        descricao: input.motivo,
+        referencia_id: absence.id,
+      } as never);
+    }
+
+    revalidatePath("/pessoas/disciplina");
+    revalidatePath("/pessoas/colaboradores");
+    return { ok: true, data: absence };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+/** Score atual de um colaborador (clamp 0-100). */
+export async function getEmployeeScore(employeeId: string): Promise<number> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return 100;
+    const { data, error } = await supabase
+      .from(SCORE_EVENTS_TABLE)
+      .select("delta")
+      .eq("employee_id", employeeId);
+    if (error) {
+      console.error("[getEmployeeScore] error:", error.message);
+      return 100;
+    }
+    return calcScore((data ?? []) as Array<{ delta: number }>);
+  } catch (e) {
+    console.error("[getEmployeeScore] exceção:", e);
+    return 100;
+  }
+}
+
+/** Histórico de score events de um colaborador (timeline). */
+export async function listScoreEvents(employeeId: string): Promise<ScoreEvent[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from(SCORE_EVENTS_TABLE)
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("[listScoreEvents] error:", error.message);
+      return [];
+    }
+    return (data ?? []) as ScoreEvent[];
+  } catch (e) {
+    console.error("[listScoreEvents] exceção:", e);
+    return [];
+  }
+}
+
+/**
+ * Score de TODOS os colaboradores da unit (1 query agregada).
+ * Pra `Score Geral` tab — evita N queries.
+ */
+export async function listEmployeeScores(unitId: string): Promise<EmployeeScore[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+
+    const { data: emps, error: empErr } = await supabase
+      .from(TABLE)
+      .select("id, nome, sobrenome, funcao, departamento, ativo")
+      .eq("unit_id", unitId)
+      .order("nome");
+    if (empErr) {
+      console.error("[listEmployeeScores] employees error:", empErr.message);
+      return [];
+    }
+    const employees = (emps ?? []) as Array<EmployeeStub & { ativo: boolean }>;
+    if (employees.length === 0) return [];
+
+    const empIds = employees.map((e) => e.id);
+
+    // 3 queries paralelas: score_events, warnings count, absences count
+    const [scoresRes, warnsRes, absRes] = await Promise.all([
+      supabase
+        .from(SCORE_EVENTS_TABLE)
+        .select("employee_id, delta")
+        .in("employee_id", empIds),
+      supabase
+        .from(WARNINGS_TABLE)
+        .select("employee_id")
+        .in("employee_id", empIds),
+      supabase
+        .from(ABSENCES_TABLE)
+        .select("employee_id")
+        .in("employee_id", empIds),
+    ]);
+
+    const eventsBy: Record<string, Array<{ delta: number }>> = {};
+    for (const r of (scoresRes.data ?? []) as Array<{ employee_id: string; delta: number }>) {
+      (eventsBy[r.employee_id] ??= []).push({ delta: r.delta });
+    }
+    const warnsBy: Record<string, number> = {};
+    for (const r of (warnsRes.data ?? []) as Array<{ employee_id: string }>) {
+      warnsBy[r.employee_id] = (warnsBy[r.employee_id] ?? 0) + 1;
+    }
+    const absBy: Record<string, number> = {};
+    for (const r of (absRes.data ?? []) as Array<{ employee_id: string }>) {
+      absBy[r.employee_id] = (absBy[r.employee_id] ?? 0) + 1;
+    }
+
+    return employees.map((emp) => ({
+      employee: emp,
+      score: calcScore(eventsBy[emp.id] ?? []),
+      warnings_count: warnsBy[emp.id] ?? 0,
+      absences_count: absBy[emp.id] ?? 0,
+    }));
+  } catch (e) {
+    console.error("[listEmployeeScores] exceção:", e);
+    return [];
+  }
 }
