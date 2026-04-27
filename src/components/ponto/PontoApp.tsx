@@ -133,6 +133,12 @@ export function PontoApp({
       }
 
       if (!res.ok) {
+        if (res.status === 401) {
+          setError(
+            "Sua sessão expirou. Toque pra recarregar e fazer login novamente.",
+          );
+          return;
+        }
         const txt = await res.text().catch(() => "");
         try {
           const j = JSON.parse(txt) as { error?: string };
@@ -539,9 +545,17 @@ function SuccessBanner({ punch }: { punch: TimeClockPunch }) {
 }
 
 function ErrorBanner({ message, onClose }: { message: string; onClose: () => void }) {
+  const isAuth = message.toLowerCase().includes("sessão");
+  const handleClick = () => {
+    if (isAuth && typeof window !== "undefined") {
+      window.location.reload();
+    } else {
+      onClose();
+    }
+  };
   return (
     <div
-      onClick={onClose}
+      onClick={handleClick}
       style={{
         padding: "12px 14px",
         background: "rgba(239,68,68,0.12)",
@@ -553,7 +567,7 @@ function ErrorBanner({ message, onClose }: { message: string; onClose: () => voi
       }}
     >
       <strong>Erro:</strong> {message}
-      <span style={{ float: "right", opacity: 0.6 }}>×</span>
+      <span style={{ float: "right", opacity: 0.6 }}>{isAuth ? "↻" : "×"}</span>
     </div>
   );
 }

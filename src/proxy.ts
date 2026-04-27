@@ -21,6 +21,16 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   if (!user && !isPublic(path)) {
+    // /api/* deve responder 401 JSON, não redirecionar pra página HTML —
+    // do contrário fetches client-side seguem o 307 com POST e batem em
+    // /login (page sem handler POST), retornando 405. Acontece em mobile
+    // PWA quando o cookie de sessão expira silenciosamente.
+    if (path.startsWith("/api/")) {
+      return NextResponse.json(
+        { ok: false, error: "Não autenticado" },
+        { status: 401 },
+      );
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
