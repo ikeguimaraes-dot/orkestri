@@ -1,23 +1,18 @@
 // POST /api/ponto/punch — registra um punch via fetch client.
 //
-// Existe pra contornar bug de PWA mobile (iOS Safari standalone): Server
-// Actions + revalidatePath() têm uma race condition onde o cookie de
-// sessão Supabase rotacionado não persiste, fazendo o próximo request
-// ser deslogado e redirecionar pra /login.
+// Auth: aceita Bearer token no header Authorization (caminho primário —
+// robusto em PWA standalone iOS) OU cookie SSR (fallback desktop).
+// Em PWA mobile o cookie de sessão pode não viajar de forma confiável,
+// então o client (PontoApp) sempre passa o access_token explicitamente.
 //
-// Esta route handler:
-//   - lê cookies via NextRequest (cookie set pelo Supabase SSR persiste
-//     na response automaticamente)
-//   - valida sessão (401 se ausente)
-//   - aceita o punch via Supabase com RLS aplicada
-//   - retorna JSON puro — client atualiza estado local sem router.refresh
-//
-// Sem revalidatePath aqui — a UI do colaborador faz optimistic update,
-// e a view do GM (/pessoas/ponto) é re-fetched no próximo SSR natural.
+// Sem revalidatePath aqui — o client faz optimistic update sem
+// router.refresh(), evitando perder a sessão num re-fetch do tree.
 
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 import type { PunchTipo, TimeClockPunch } from "@/types/pessoas";
 
 export const runtime = "nodejs";
@@ -36,6 +31,13 @@ const VALID_TIPOS: ReadonlyArray<PunchTipo> = [
   "intervalo_inicio",
   "intervalo_fim",
 ];
+
+function bearerFromHeader(req: Request): string | null {
+  const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!auth) return null;
+  const m = /^Bearer\s+(.+)$/i.exec(auth);
+  return m ? m[1]!.trim() : null;
+}
 
 export async function POST(req: Request) {
   let body: Body;
@@ -58,14 +60,39 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
+  // ── Resolve client autenticado ───────────────────────────────
+  // 1) Bearer token: cria client escopado pro user (PostgREST usa o JWT
+  //    em todas as queries → RLS funciona normalmente)
+  // 2) Cookie SSR: fallback caso o header não venha
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) {
     return NextResponse.json(
-      { ok: false, error: "Supabase indisponível" },
+      { ok: false, error: "Supabase env ausente" },
       { status: 503 },
     );
   }
 
+  const token = bearerFromHeader(req);
+  let supabase;
+
+  if (token) {
+    supabase = createClient<Database>(url, anon, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+  } else {
+    const cookieClient = await createSupabaseServerClient();
+    if (!cookieClient) {
+      return NextResponse.json(
+        { ok: false, error: "Supabase indisponível" },
+        { status: 503 },
+      );
+    }
+    supabase = cookieClient;
+  }
+
+  // Valida que tem user real por trás
   const {
     data: { user },
     error: authErr,

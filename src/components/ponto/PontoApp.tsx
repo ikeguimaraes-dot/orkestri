@@ -15,6 +15,7 @@ import {
 
 import { CameraCapture } from "@/components/ponto/CameraCapture";
 import { useDeviceInfo, useGeolocation } from "@/components/ponto/useGeolocation";
+import { getBrowserClient } from "@/lib/supabase/client";
 import {
   PUNCH_BUTTON_LABEL,
   PUNCH_COLOR,
@@ -109,16 +110,31 @@ export function PontoApp({
       const lat = geoState.status === "ok" ? geoState.lat : null;
       const lng = geoState.status === "ok" ? geoState.lng : null;
 
-      // POST via fetch em vez de Server Action — em PWA standalone iOS,
-      // Server Actions + revalidatePath têm race condition que perde o
-      // cookie de sessão Supabase, fazendo o user ser jogado pra /login.
-      // Route handler /api/ponto/punch evita isso.
+      // POST via fetch + Bearer token. Em PWA standalone iOS, cookies de
+      // sessão SSR podem não viajar consistentemente em fetches mesmo com
+      // credentials="include". Pegar o access_token direto do browser
+      // client e passar no header Authorization é o caminho mais robusto.
+      // O server valida via supabase.auth.getUser(token).
+      let accessToken: string | null = null;
+      const browserClient = getBrowserClient();
+      if (browserClient) {
+        const { data } = await browserClient.auth.getSession();
+        accessToken = data.session?.access_token ?? null;
+      }
+      if (!accessToken) {
+        setError("Sua sessão expirou. Toque pra recarregar e fazer login novamente.");
+        return;
+      }
+
       let res: Response;
       try {
         res = await fetch("/api/ponto/punch", {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${accessToken}`,
+          },
+          credentials: "include", // mantém cookie como caminho secundário
           body: JSON.stringify({
             employeeId,
             tipo: next,
