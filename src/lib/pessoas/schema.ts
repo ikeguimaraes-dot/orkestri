@@ -91,6 +91,72 @@ export const employeeFormSchema = z
       )
       .transform((v) => (v ? (v as "corrente" | "poupanca" | "salario") : null)),
     pix: optionalString,
+
+    // ── HOS RH expansion (migration 011) ────────────────────────
+    // Identificação
+    employee_code: optionalString,
+    esocial_code: optionalString,
+    nome_social: optionalString,
+
+    // Nascimento
+    data_nascimento: optionalString,
+    cidade_nascimento: optionalString,
+    uf_nascimento: optionalUf,
+    pais_nascimento: optionalString,
+    estado_civil: optionalString,
+
+    // Contrato
+    tipo_contrato: z
+      .string()
+      .trim()
+      .optional()
+      .or(z.literal(""))
+      .refine(
+        (v) => !v || ["CLT", "PJ", "temporario", "estagiario"].includes(v),
+        "Tipo de contrato inválido",
+      )
+      .transform((v) =>
+        v ? (v as "CLT" | "PJ" | "temporario" | "estagiario") : null,
+      ),
+    jornada: optionalString,
+    status_rh: z
+      .string()
+      .trim()
+      .optional()
+      .or(z.literal(""))
+      .refine(
+        (v) => !v || ["ativo", "inativo", "ferias", "afastado"].includes(v),
+        "Status inválido",
+      )
+      .transform((v) =>
+        v ? (v as "ativo" | "inativo" | "ferias" | "afastado") : "ativo",
+      ),
+
+    // Contato
+    telefone: optionalString,
+    email: z
+      .string()
+      .trim()
+      .optional()
+      .or(z.literal(""))
+      .refine(
+        (v) => !v || /^\S+@\S+\.\S+$/.test(v),
+        "Email inválido",
+      )
+      .transform((v) => (v ? v : null)),
+    photo_url: optionalString,
+
+    // Emergência
+    contato_emergencia_nome: optionalString,
+    contato_emergencia_tel: optionalString,
+
+    // Eleitoral + estrangeiro
+    zona_eleitoral: optionalString,
+    secao_eleitoral: optionalString,
+    rne: optionalString,
+    rne_orgao: optionalString,
+    rne_expedicao: optionalString,
+    ctps_expedicao: optionalString,
   })
   .strict();
 

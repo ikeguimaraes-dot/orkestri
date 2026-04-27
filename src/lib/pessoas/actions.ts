@@ -15,6 +15,9 @@ import type {
   EmployeeStub,
   EmployeeUpdate,
   GeneratePayslipInput,
+  OvertimeRecord,
+  OvertimeRecordInsert,
+  OvertimeRecordUpdate,
   Payslip,
   PayslipStatus,
   PayslipWithEmployee,
@@ -25,6 +28,17 @@ import type {
   ShiftInsert,
   ShiftUpdate,
   TimeClockPunch,
+  TimeRecord,
+  TipsRecord,
+  TipsRecordInsert,
+  TipsRecordUpdate,
+  TransportVoucher,
+  TransportVoucherInsert,
+  TransportVoucherUpdate,
+  Vacation,
+  VacationInsert,
+  VacationStatus,
+  VacationUpdate,
   Warning,
   WarningInsert,
   WarningNivel,
@@ -39,6 +53,11 @@ const WARNINGS_TABLE = "warnings" as const;
 const ABSENCES_TABLE = "absences" as const;
 const SCORE_EVENTS_TABLE = "score_events" as const;
 const PUNCHES_TABLE = "time_clock_punches" as const;
+const TIPS_TABLE = "tips_records" as const;
+const VT_TABLE = "transport_vouchers" as const;
+const OT_TABLE = "overtime_records" as const;
+const VAC_TABLE = "vacations" as const;
+const TIMEREC_TABLE = "time_records" as const;
 
 // Nota: o builder do @supabase/ssr infere `never` em insert/update quando
 // PostgrestVersion 12 + custom Database<T>. As entradas já estão validadas
@@ -1012,3 +1031,381 @@ export async function getMyEmployee(): Promise<Employee | null> {
 // Helpers puros (calcWorkHours, nextPunchTipo, formatters) moraram aqui mas
 // foram movidos pra src/lib/pessoas/punch.ts — em arquivo "use server" todos
 // os exports viram Server Actions (RPC), o que quebraria o relógio do client.
+
+// ── Gorjetas (tips_records) ────────────────────────────────────
+
+export async function listTipsRecords(employeeId: string): Promise<TipsRecord[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from(TIPS_TABLE)
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("periodo", { ascending: false });
+    if (error) {
+      console.error("[listTipsRecords]", error.message);
+      return [];
+    }
+    return (data ?? []) as TipsRecord[];
+  } catch (e) {
+    console.error("[listTipsRecords] exceção:", e);
+    return [];
+  }
+}
+
+export async function createTipsRecord(
+  input: TipsRecordInsert,
+): Promise<ActionResult<TipsRecord>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(TIPS_TABLE)
+      .insert(input as never)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao criar gorjeta" };
+    }
+    revalidatePath(`/pessoas/colaboradores/${input.employee_id}`);
+    return { ok: true, data: data as TipsRecord };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function updateTipsRecord(
+  id: string,
+  patch: TipsRecordUpdate,
+): Promise<ActionResult<TipsRecord>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(TIPS_TABLE)
+      .update(patch as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    if ((data as TipsRecord).employee_id) {
+      revalidatePath(`/pessoas/colaboradores/${(data as TipsRecord).employee_id}`);
+    }
+    return { ok: true, data: data as TipsRecord };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function deleteTipsRecord(id: string): Promise<ActionResult<null>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { error } = await supabase.from(TIPS_TABLE).delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/pessoas");
+    return { ok: true, data: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+// ── Vale Transporte (transport_vouchers) ───────────────────────
+
+export async function listTransportVouchers(
+  employeeId: string,
+): Promise<TransportVoucher[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from(VT_TABLE)
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("periodo", { ascending: false });
+    if (error) {
+      console.error("[listTransportVouchers]", error.message);
+      return [];
+    }
+    return (data ?? []) as TransportVoucher[];
+  } catch (e) {
+    console.error("[listTransportVouchers] exceção:", e);
+    return [];
+  }
+}
+
+export async function createTransportVoucher(
+  input: TransportVoucherInsert,
+): Promise<ActionResult<TransportVoucher>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(VT_TABLE)
+      .insert(input as never)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    revalidatePath(`/pessoas/colaboradores/${input.employee_id}`);
+    return { ok: true, data: data as TransportVoucher };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function updateTransportVoucher(
+  id: string,
+  patch: TransportVoucherUpdate,
+): Promise<ActionResult<TransportVoucher>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(VT_TABLE)
+      .update(patch as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    if ((data as TransportVoucher).employee_id) {
+      revalidatePath(`/pessoas/colaboradores/${(data as TransportVoucher).employee_id}`);
+    }
+    return { ok: true, data: data as TransportVoucher };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function deleteTransportVoucher(id: string): Promise<ActionResult<null>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { error } = await supabase.from(VT_TABLE).delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/pessoas");
+    return { ok: true, data: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+// ── Horas Extras (overtime_records) ────────────────────────────
+
+export async function listOvertimeRecords(
+  employeeId: string,
+): Promise<OvertimeRecord[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from(OT_TABLE)
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("date", { ascending: false });
+    if (error) {
+      console.error("[listOvertimeRecords]", error.message);
+      return [];
+    }
+    return (data ?? []) as OvertimeRecord[];
+  } catch (e) {
+    console.error("[listOvertimeRecords] exceção:", e);
+    return [];
+  }
+}
+
+export async function createOvertimeRecord(
+  input: OvertimeRecordInsert,
+): Promise<ActionResult<OvertimeRecord>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const payload = { source: "manual" as const, ...input };
+    const { data, error } = await supabase
+      .from(OT_TABLE)
+      .insert(payload as never)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    revalidatePath(`/pessoas/colaboradores/${input.employee_id}`);
+    return { ok: true, data: data as OvertimeRecord };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function updateOvertimeRecord(
+  id: string,
+  patch: OvertimeRecordUpdate,
+): Promise<ActionResult<OvertimeRecord>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(OT_TABLE)
+      .update(patch as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    if ((data as OvertimeRecord).employee_id) {
+      revalidatePath(`/pessoas/colaboradores/${(data as OvertimeRecord).employee_id}`);
+    }
+    return { ok: true, data: data as OvertimeRecord };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function deleteOvertimeRecord(id: string): Promise<ActionResult<null>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { error } = await supabase.from(OT_TABLE).delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/pessoas");
+    return { ok: true, data: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+/**
+ * Aprovar/rejeitar HE. approverId vem do user logado via auth.uid() —
+ * passa explícito pra UI poder decidir (ou pode ser null pra revogar).
+ */
+export async function approveOvertime(
+  id: string,
+  approved: boolean,
+  approverId: string | null,
+): Promise<ActionResult<OvertimeRecord>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(OT_TABLE)
+      .update({ approved, approved_by: approverId } as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    if ((data as OvertimeRecord).employee_id) {
+      revalidatePath(`/pessoas/colaboradores/${(data as OvertimeRecord).employee_id}`);
+    }
+    return { ok: true, data: data as OvertimeRecord };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+// ── Férias (vacations) ─────────────────────────────────────────
+
+export async function listVacations(
+  unitIdOrEmployeeId: string,
+  scope: "unit" | "employee" = "employee",
+): Promise<Vacation[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const col = scope === "unit" ? "unit_id" : "employee_id";
+    const { data, error } = await supabase
+      .from(VAC_TABLE)
+      .select("*")
+      .eq(col, unitIdOrEmployeeId)
+      .order("start_date", { ascending: false });
+    if (error) {
+      console.error("[listVacations]", error.message);
+      return [];
+    }
+    return (data ?? []) as Vacation[];
+  } catch (e) {
+    console.error("[listVacations] exceção:", e);
+    return [];
+  }
+}
+
+export async function createVacation(
+  input: VacationInsert,
+): Promise<ActionResult<Vacation>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(VAC_TABLE)
+      .insert(input as never)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    revalidatePath(`/pessoas/colaboradores/${input.employee_id}`);
+    revalidatePath(`/pessoas/ferias`);
+    return { ok: true, data: data as Vacation };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function updateVacation(
+  id: string,
+  patch: VacationUpdate,
+): Promise<ActionResult<Vacation>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(VAC_TABLE)
+      .update({ ...patch, updated_at: new Date().toISOString() } as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+    if ((data as Vacation).employee_id) {
+      revalidatePath(`/pessoas/colaboradores/${(data as Vacation).employee_id}`);
+    }
+    revalidatePath(`/pessoas/ferias`);
+    return { ok: true, data: data as Vacation };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function updateVacationStatus(
+  id: string,
+  status: VacationStatus,
+): Promise<ActionResult<Vacation>> {
+  return updateVacation(id, { status });
+}
+
+export async function deleteVacation(id: string): Promise<ActionResult<null>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { error } = await supabase.from(VAC_TABLE).delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath(`/pessoas/ferias`);
+    return { ok: true, data: null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+// ── Banco de horas / Totvs (time_records) — read-only ──────────
+
+export async function listTimeRecords(employeeId: string): Promise<TimeRecord[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from(TIMEREC_TABLE)
+      .select("*")
+      .eq("employee_id", employeeId)
+      .order("periodo", { ascending: false });
+    if (error) {
+      console.error("[listTimeRecords]", error.message);
+      return [];
+    }
+    return (data ?? []) as TimeRecord[];
+  } catch (e) {
+    console.error("[listTimeRecords] exceção:", e);
+    return [];
+  }
+}

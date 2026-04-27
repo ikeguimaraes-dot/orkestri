@@ -14,6 +14,11 @@ export type PayslipStatus = "rascunho" | "aprovado" | "pago";
 
 export type TipoConta = "corrente" | "poupanca" | "salario" | string;
 
+// Migration 011 (HOS RH) adicionou 23 campos opcionais ao employees.
+// `score` e `status_rh` são NOT NULL com defaults — opcionais no Insert.
+export type TipoContrato = "CLT" | "PJ" | "temporario" | "estagiario";
+export type StatusRH = "ativo" | "inativo" | "ferias" | "afastado";
+
 export type Employee = {
   id: string;
   unit_id: string;
@@ -24,12 +29,18 @@ export type Employee = {
   ctps: string | null;
   ctps_serie: string | null;
   ctps_uf: string | null;
+  ctps_expedicao: string | null;
   rg: string | null;
   rg_orgao: string | null;
   rg_uf: string | null;
   pis: string | null;
   titulo_eleitor: string | null;
+  zona_eleitoral: string | null;
+  secao_eleitoral: string | null;
   reservista: string | null;
+  rne: string | null;
+  rne_orgao: string | null;
+  rne_expedicao: string | null;
   rua: string | null;
   numero: string | null;
   complemento: string | null;
@@ -53,6 +64,24 @@ export type Employee = {
   conta: string | null;
   tipo_conta: TipoConta | null;
   pix: string | null;
+  // ─ HOS RH expansion ─
+  employee_code: string | null;
+  esocial_code: string | null;
+  nome_social: string | null;
+  data_nascimento: string | null;
+  cidade_nascimento: string | null;
+  uf_nascimento: string | null;
+  pais_nascimento: string | null;
+  estado_civil: string | null;
+  tipo_contrato: TipoContrato | null;
+  jornada: string | null;
+  telefone: string | null;
+  email: string | null;
+  contato_emergencia_nome: string | null;
+  contato_emergencia_tel: string | null;
+  photo_url: string | null;
+  status_rh: StatusRH;
+  score: number;
   created_at: string;
   updated_at: string;
 };
@@ -67,12 +96,18 @@ export type EmployeeInsert = {
   ctps?: string | null;
   ctps_serie?: string | null;
   ctps_uf?: string | null;
+  ctps_expedicao?: string | null;
   rg?: string | null;
   rg_orgao?: string | null;
   rg_uf?: string | null;
   pis?: string | null;
   titulo_eleitor?: string | null;
+  zona_eleitoral?: string | null;
+  secao_eleitoral?: string | null;
   reservista?: string | null;
+  rne?: string | null;
+  rne_orgao?: string | null;
+  rne_expedicao?: string | null;
   rua?: string | null;
   numero?: string | null;
   complemento?: string | null;
@@ -96,6 +131,23 @@ export type EmployeeInsert = {
   conta?: string | null;
   tipo_conta?: string | null;
   pix?: string | null;
+  employee_code?: string | null;
+  esocial_code?: string | null;
+  nome_social?: string | null;
+  data_nascimento?: string | null;
+  cidade_nascimento?: string | null;
+  uf_nascimento?: string | null;
+  pais_nascimento?: string | null;
+  estado_civil?: string | null;
+  tipo_contrato?: TipoContrato | null;
+  jornada?: string | null;
+  telefone?: string | null;
+  email?: string | null;
+  contato_emergencia_nome?: string | null;
+  contato_emergencia_tel?: string | null;
+  photo_url?: string | null;
+  status_rh?: StatusRH;
+  score?: number;
 };
 
 export type EmployeeUpdate = Partial<Omit<EmployeeInsert, "unit_id">>;
@@ -381,3 +433,263 @@ export type CCTVersionInsert = {
   dados_completos?: Json | null;
   ativo?: boolean;
 };
+
+// ── HOS RH expansion (migrations 011–018) ──────────────────────
+
+// Documentos pessoais (storage path no bucket `documents`).
+export type DocumentTipo = "RG" | "CPF" | "CTPS" | "contrato" | "exame" | "outro";
+
+export type Document = {
+  id: string;
+  employee_id: string;
+  unit_id: string;
+  name: string;
+  type: DocumentTipo;
+  storage_path: string;
+  notes: string | null;
+  uploaded_at: string;
+};
+
+export type DocumentInsert = {
+  id?: string;
+  employee_id: string;
+  unit_id: string;
+  name: string;
+  type: DocumentTipo;
+  storage_path: string;
+  notes?: string | null;
+};
+
+export type DocumentUpdate = Partial<Omit<DocumentInsert, "employee_id" | "unit_id">>;
+export type DocumentWithEmployee = Document & { employee: EmployeeStub | null };
+
+// Auth do app mobile (sem auth.users — bcrypt em CPF).
+export type EmployeeAuth = {
+  id: string;
+  employee_id: string;
+  cpf: string;
+  password_hash: string;
+  is_active: boolean;
+  last_login: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployeeAuthInsert = {
+  id?: string;
+  employee_id: string;
+  cpf: string;
+  password_hash: string;
+  is_active?: boolean;
+};
+
+export type EmployeeAuthUpdate = Partial<Omit<EmployeeAuthInsert, "employee_id">>;
+
+// Gorjetas — pontos_liquidos é GENERATED no banco.
+export type TipsRecord = {
+  id: string;
+  employee_id: string;
+  unit_id: string;
+  periodo: string;          // DATE — primeiro dia do mês
+  valor_ponto: string;      // NUMERIC(10,4)
+  total_pontos: number;
+  abatimento_pontos: number;
+  pontos_liquidos: number;  // GENERATED
+  observacoes: string | null;
+  created_at: string;
+};
+
+export type TipsRecordInsert = {
+  id?: string;
+  employee_id: string;
+  unit_id: string;
+  periodo: string;
+  valor_ponto: string | number;
+  total_pontos: number;
+  abatimento_pontos?: number;
+  observacoes?: string | null;
+};
+
+export type TipsRecordUpdate = Partial<Omit<TipsRecordInsert, "employee_id" | "unit_id">>;
+export type TipsRecordWithEmployee = TipsRecord & { employee: EmployeeStub | null };
+
+// Vale Transporte — desconto_funcionario padrão 6%, valor_empresa = bruto - desconto.
+export type TransportVoucher = {
+  id: string;
+  employee_id: string;
+  unit_id: string;
+  periodo: string;
+  dias_uteis: number;
+  valor_diario: string;
+  total_bruto: string;
+  desconto_funcionario: string;
+  valor_empresa: string;
+  operadora: string | null;
+  observacoes: string | null;
+  created_at: string;
+};
+
+export type TransportVoucherInsert = {
+  id?: string;
+  employee_id: string;
+  unit_id: string;
+  periodo: string;
+  dias_uteis: number;
+  valor_diario: string | number;
+  total_bruto: string | number;
+  desconto_funcionario?: string | number;
+  valor_empresa: string | number;
+  operadora?: string | null;
+  observacoes?: string | null;
+};
+
+export type TransportVoucherUpdate = Partial<
+  Omit<TransportVoucherInsert, "employee_id" | "unit_id">
+>;
+export type TransportVoucherWithEmployee = TransportVoucher & {
+  employee: EmployeeStub | null;
+};
+
+// Banco de horas / Totvs (read-only no UI normal — vem por importação).
+export type TimeRecord = {
+  id: string;
+  employee_id: string;
+  unit_id: string;
+  periodo: string;
+  horas_previstas: string | null;
+  horas_trabalhadas: string | null;
+  banco_horas_positivo: string | null;
+  banco_horas_negativo: string | null;
+  saldo_banco: string | null;
+  banco_horas_acumulado: string | null;
+  faltas_injustificadas_dias: number | null;
+  atestado_horas: string | null;
+  afastamentos_dias: number | null;
+  ferias_dias: number | null;
+  adicional_noturno: string | null;
+  fonte: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type TimeRecordInsert = Omit<TimeRecord, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type TimeRecordUpdate = Partial<Omit<TimeRecordInsert, "employee_id" | "unit_id">>;
+export type TimeRecordWithEmployee = TimeRecord & { employee: EmployeeStub | null };
+
+// Férias.
+export type VacationStatus = "agendada" | "em_andamento" | "concluida" | "cancelada";
+
+export type Vacation = {
+  id: string;
+  employee_id: string;
+  unit_id: string;
+  start_date: string;
+  end_date: string;
+  acquisitive_period_start: string | null;
+  acquisitive_period_end: string | null;
+  days_entitled: number;
+  days_taken: number | null;
+  abono_days: number | null;
+  is_double_pay: boolean;
+  status: VacationStatus;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VacationInsert = {
+  id?: string;
+  employee_id: string;
+  unit_id: string;
+  start_date: string;
+  end_date: string;
+  acquisitive_period_start?: string | null;
+  acquisitive_period_end?: string | null;
+  days_entitled?: number;
+  days_taken?: number | null;
+  abono_days?: number | null;
+  is_double_pay?: boolean;
+  status?: VacationStatus;
+  notes?: string | null;
+  created_by?: string | null;
+};
+
+export type VacationUpdate = Partial<Omit<VacationInsert, "employee_id" | "unit_id">>;
+export type VacationWithEmployee = Vacation & { employee: EmployeeStub | null };
+
+// Horas Extras (manuais ou Totvs).
+export type OvertimeType = "50" | "100" | "banco";
+export type OvertimeSource = "manual" | "totvs";
+
+export type OvertimeRecord = {
+  id: string;
+  employee_id: string;
+  unit_id: string;
+  date: string;
+  hours: string;
+  type: OvertimeType;
+  reason: string | null;
+  approved: boolean | null;
+  approved_by: string | null;
+  periodo: string | null;
+  source: OvertimeSource;
+  created_at: string;
+};
+
+export type OvertimeRecordInsert = {
+  id?: string;
+  employee_id: string;
+  unit_id: string;
+  date: string;
+  hours: string | number;
+  type: OvertimeType;
+  reason?: string | null;
+  approved?: boolean | null;
+  approved_by?: string | null;
+  periodo?: string | null;
+  source?: OvertimeSource;
+};
+
+export type OvertimeRecordUpdate = Partial<
+  Omit<OvertimeRecordInsert, "employee_id" | "unit_id">
+>;
+export type OvertimeRecordWithEmployee = OvertimeRecord & {
+  employee: EmployeeStub | null;
+};
+
+// Logs de importação.
+export type ImportTipo = "ponto" | "holerites" | "gorjetas" | "vt";
+
+export type ImportLog = {
+  id: string;
+  unit_id: string;
+  periodo: string;
+  tipo: ImportTipo;
+  total_linhas: number | null;
+  importados: number | null;
+  nao_encontrados: number | null;
+  erros: number | null;
+  detalhes: Json | null;
+  imported_by: string | null;
+  imported_at: string;
+};
+
+export type ImportLogInsert = {
+  id?: string;
+  unit_id: string;
+  periodo: string;
+  tipo: ImportTipo;
+  total_linhas?: number | null;
+  importados?: number | null;
+  nao_encontrados?: number | null;
+  erros?: number | null;
+  detalhes?: Json | null;
+  imported_by?: string | null;
+};
+
+export type ImportLogUpdate = Partial<Omit<ImportLogInsert, "unit_id">>;

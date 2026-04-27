@@ -5,19 +5,26 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Wallet, Users, BookOpen, ShoppingCart,
-  MessageSquare, Brain, Megaphone, ChevronDown, Check, LogOut,
+  MessageSquare, Brain, Megaphone, CalendarDays,
+  Plane, Briefcase, Building2,
+  ChevronDown, Check, LogOut,
 } from "lucide-react";
 import { useAuth, useUnit } from "@/lib/auth/context";
 
+// Marcas usa Building2 agora (Megaphone foi pra Campanhas — comunicação interna).
 const NAV = [
-  { href: "/",             label: "Dashboard",     icon: LayoutDashboard },
-  { href: "/operacao",     label: "Operação",      icon: Wallet },
-  { href: "/pessoas",      label: "Pessoas",       icon: Users },
-  { href: "/cardapio",     label: "Cardápio",      icon: BookOpen },
-  { href: "/compras",      label: "Compras",       icon: ShoppingCart },
-  { href: "/cliente",      label: "Cliente",       icon: MessageSquare },
-  { href: "/inteligencia", label: "Inteligência",  icon: Brain },
-  { href: "/marca",        label: "Marca",         icon: Megaphone },
+  { href: "/dashboard",     label: "Dashboard",     icon: LayoutDashboard },
+  { href: "/financeiro",    label: "Financeiro",    icon: Wallet },
+  { href: "/pessoas",       label: "Pessoas",       icon: Users },
+  { href: "/pessoas/ferias", label: "Férias",       icon: Plane },
+  { href: "/cardapio",      label: "Cardápio",      icon: BookOpen },
+  { href: "/compras",       label: "Compras",       icon: ShoppingCart },
+  { href: "/cliente",       label: "Cliente",       icon: MessageSquare },
+  { href: "/inteligencia",  label: "Inteligência",  icon: Brain },
+  { href: "/marcas",        label: "Marcas",        icon: Building2 },
+  { href: "/eventos",       label: "Eventos",       icon: CalendarDays },
+  { href: "/campanhas",     label: "Campanhas",     icon: Megaphone },
+  { href: "/recrutamento/vagas", label: "Recrutamento", icon: Briefcase },
 ];
 
 export function Sidebar() {
@@ -146,10 +153,25 @@ export function Sidebar() {
           gap: 1, overflowY: "auto",
         }}
       >
-        {NAV.map((it) => {
-          const Icon = it.icon;
-          const active = it.href === "/" ? pathname === "/" : pathname.startsWith(it.href);
-          return (
+        {(() => {
+          // Pinta APENAS o item de match mais específico (ex: em /pessoas/ferias
+          // só "Férias" fica ativo, não "Pessoas").
+          let bestIdx = -1;
+          let bestLen = -1;
+          NAV.forEach((it, i) => {
+            const matches =
+              it.href === "/"
+                ? pathname === "/"
+                : pathname === it.href || pathname.startsWith(it.href + "/");
+            if (matches && it.href.length > bestLen) {
+              bestIdx = i;
+              bestLen = it.href.length;
+            }
+          });
+          return NAV.map((it, i) => {
+            const Icon = it.icon;
+            const active = i === bestIdx;
+            return (
             <Link
               key={it.href}
               href={it.href}
@@ -180,7 +202,8 @@ export function Sidebar() {
               <span style={{ flex: 1 }}>{it.label}</span>
             </Link>
           );
-        })}
+          });
+        })()}
       </nav>
 
       <div

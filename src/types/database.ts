@@ -316,6 +316,10 @@ export type Database = {
       };
       // ── Fase 1 / Pessoas ──────────────────────────────────────
       employees: {
+        // Migration 011 (HOS RH): adicionou 23 colunas operacionais —
+        // employee_code, esocial_code, nome_social, dados de nascimento,
+        // contrato/jornada, contato, emergência, eleitoral, RNE, status_rh,
+        // score, ctps_expedicao.
         Row: {
           id: string;
           unit_id: string;
@@ -326,12 +330,18 @@ export type Database = {
           ctps: string | null;
           ctps_serie: string | null;
           ctps_uf: string | null;
+          ctps_expedicao: string | null;
           rg: string | null;
           rg_orgao: string | null;
           rg_uf: string | null;
           pis: string | null;
           titulo_eleitor: string | null;
+          zona_eleitoral: string | null;
+          secao_eleitoral: string | null;
           reservista: string | null;
+          rne: string | null;
+          rne_orgao: string | null;
+          rne_expedicao: string | null;
           rua: string | null;
           numero: string | null;
           complemento: string | null;
@@ -355,6 +365,24 @@ export type Database = {
           conta: string | null;
           tipo_conta: string | null;
           pix: string | null;
+          // ─ HOS RH expansion ─
+          employee_code: string | null;
+          esocial_code: string | null;
+          nome_social: string | null;
+          data_nascimento: string | null;
+          cidade_nascimento: string | null;
+          uf_nascimento: string | null;
+          pais_nascimento: string | null;
+          estado_civil: string | null;
+          tipo_contrato: "CLT" | "PJ" | "temporario" | "estagiario" | null;
+          jornada: string | null;
+          telefone: string | null;
+          email: string | null;
+          contato_emergencia_nome: string | null;
+          contato_emergencia_tel: string | null;
+          photo_url: string | null;
+          status_rh: "ativo" | "inativo" | "ferias" | "afastado";
+          score: number;
           created_at: string;
           updated_at: string;
         };
@@ -368,12 +396,18 @@ export type Database = {
           ctps?: string | null;
           ctps_serie?: string | null;
           ctps_uf?: string | null;
+          ctps_expedicao?: string | null;
           rg?: string | null;
           rg_orgao?: string | null;
           rg_uf?: string | null;
           pis?: string | null;
           titulo_eleitor?: string | null;
+          zona_eleitoral?: string | null;
+          secao_eleitoral?: string | null;
           reservista?: string | null;
+          rne?: string | null;
+          rne_orgao?: string | null;
+          rne_expedicao?: string | null;
           rua?: string | null;
           numero?: string | null;
           complemento?: string | null;
@@ -397,6 +431,23 @@ export type Database = {
           conta?: string | null;
           tipo_conta?: string | null;
           pix?: string | null;
+          employee_code?: string | null;
+          esocial_code?: string | null;
+          nome_social?: string | null;
+          data_nascimento?: string | null;
+          cidade_nascimento?: string | null;
+          uf_nascimento?: string | null;
+          pais_nascimento?: string | null;
+          estado_civil?: string | null;
+          tipo_contrato?: "CLT" | "PJ" | "temporario" | "estagiario" | null;
+          jornada?: string | null;
+          telefone?: string | null;
+          email?: string | null;
+          contato_emergencia_nome?: string | null;
+          contato_emergencia_tel?: string | null;
+          photo_url?: string | null;
+          status_rh?: "ativo" | "inativo" | "ferias" | "afastado";
+          score?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -410,12 +461,18 @@ export type Database = {
           ctps?: string | null;
           ctps_serie?: string | null;
           ctps_uf?: string | null;
+          ctps_expedicao?: string | null;
           rg?: string | null;
           rg_orgao?: string | null;
           rg_uf?: string | null;
           pis?: string | null;
           titulo_eleitor?: string | null;
+          zona_eleitoral?: string | null;
+          secao_eleitoral?: string | null;
           reservista?: string | null;
+          rne?: string | null;
+          rne_orgao?: string | null;
+          rne_expedicao?: string | null;
           rua?: string | null;
           numero?: string | null;
           complemento?: string | null;
@@ -439,6 +496,23 @@ export type Database = {
           conta?: string | null;
           tipo_conta?: string | null;
           pix?: string | null;
+          employee_code?: string | null;
+          esocial_code?: string | null;
+          nome_social?: string | null;
+          data_nascimento?: string | null;
+          cidade_nascimento?: string | null;
+          uf_nascimento?: string | null;
+          pais_nascimento?: string | null;
+          estado_civil?: string | null;
+          tipo_contrato?: "CLT" | "PJ" | "temporario" | "estagiario" | null;
+          jornada?: string | null;
+          telefone?: string | null;
+          email?: string | null;
+          contato_emergencia_nome?: string | null;
+          contato_emergencia_tel?: string | null;
+          photo_url?: string | null;
+          status_rh?: "ativo" | "inativo" | "ferias" | "afastado";
+          score?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -671,6 +745,7 @@ export type Database = {
         };
       };
       payslips: {
+        // Migration 011: +fgts_base, +fgts_mes, +faixa_irrf, +employee_code.
         Row: {
           id: string;
           employee_id: string;
@@ -689,6 +764,10 @@ export type Database = {
           liquido: string;
           status: string;
           pdf_url: string | null;
+          fgts_base: string | null;
+          fgts_mes: string | null;
+          faixa_irrf: string | null;
+          employee_code: string | null;
           created_at: string;
         };
         Insert: {
@@ -709,6 +788,10 @@ export type Database = {
           liquido: string | number;
           status?: string;
           pdf_url?: string | null;
+          fgts_base?: string | number | null;
+          fgts_mes?: string | number | null;
+          faixa_irrf?: string | null;
+          employee_code?: string | null;
           created_at?: string;
         };
         Update: {
@@ -729,9 +812,549 @@ export type Database = {
           liquido?: string | number;
           status?: string;
           pdf_url?: string | null;
+          fgts_base?: string | number | null;
+          fgts_mes?: string | number | null;
+          faixa_irrf?: string | null;
+          employee_code?: string | null;
           created_at?: string;
         };
       };
+
+      // ── HOS RH expansion (migrations 011–018) ────────────────
+
+      employee_auth: {
+        // Auth do app mobile (CPF + bcrypt). NÃO usa auth.users do Supabase.
+        Row: {
+          id: string;
+          employee_id: string;
+          cpf: string;
+          password_hash: string;
+          is_active: boolean;
+          last_login: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          cpf: string;
+          password_hash: string;
+          is_active?: boolean;
+          last_login?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          cpf?: string;
+          password_hash?: string;
+          is_active?: boolean;
+          last_login?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+
+      documents: {
+        // Documentos pessoais do colaborador (storage path, type ENUM-like).
+        Row: {
+          id: string;
+          employee_id: string;
+          unit_id: string;
+          name: string;
+          type: "RG" | "CPF" | "CTPS" | "contrato" | "exame" | "outro";
+          storage_path: string;
+          notes: string | null;
+          uploaded_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          unit_id: string;
+          name: string;
+          type: "RG" | "CPF" | "CTPS" | "contrato" | "exame" | "outro";
+          storage_path: string;
+          notes?: string | null;
+          uploaded_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          unit_id?: string;
+          name?: string;
+          type?: "RG" | "CPF" | "CTPS" | "contrato" | "exame" | "outro";
+          storage_path?: string;
+          notes?: string | null;
+          uploaded_at?: string;
+        };
+      };
+
+      tips_records: {
+        // Gorjetas por período. pontos_liquidos = total_pontos - abatimento (GENERATED).
+        Row: {
+          id: string;
+          employee_id: string;
+          unit_id: string;
+          periodo: string; // DATE — primeiro dia do mês
+          valor_ponto: string; // NUMERIC(10,4)
+          total_pontos: number;
+          abatimento_pontos: number;
+          pontos_liquidos: number; // GENERATED
+          observacoes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          unit_id: string;
+          periodo: string;
+          valor_ponto: string | number;
+          total_pontos: number;
+          abatimento_pontos?: number;
+          observacoes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          unit_id?: string;
+          periodo?: string;
+          valor_ponto?: string | number;
+          total_pontos?: number;
+          abatimento_pontos?: number;
+          observacoes?: string | null;
+          created_at?: string;
+        };
+      };
+
+      transport_vouchers: {
+        // VT por período. valor_empresa = total_bruto - desconto_funcionario.
+        Row: {
+          id: string;
+          employee_id: string;
+          unit_id: string;
+          periodo: string;
+          dias_uteis: number;
+          valor_diario: string;
+          total_bruto: string;
+          desconto_funcionario: string;
+          valor_empresa: string;
+          operadora: string | null;
+          observacoes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          unit_id: string;
+          periodo: string;
+          dias_uteis: number;
+          valor_diario: string | number;
+          total_bruto: string | number;
+          desconto_funcionario?: string | number;
+          valor_empresa: string | number;
+          operadora?: string | null;
+          observacoes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          unit_id?: string;
+          periodo?: string;
+          dias_uteis?: number;
+          valor_diario?: string | number;
+          total_bruto?: string | number;
+          desconto_funcionario?: string | number;
+          valor_empresa?: string | number;
+          operadora?: string | null;
+          observacoes?: string | null;
+          created_at?: string;
+        };
+      };
+
+      time_records: {
+        // Importação de ponto/banco horas (Totvs). Read-only no UI normal.
+        Row: {
+          id: string;
+          employee_id: string;
+          unit_id: string;
+          periodo: string;
+          horas_previstas: string | null;
+          horas_trabalhadas: string | null;
+          banco_horas_positivo: string | null;
+          banco_horas_negativo: string | null;
+          saldo_banco: string | null;
+          banco_horas_acumulado: string | null;
+          faltas_injustificadas_dias: number | null;
+          atestado_horas: string | null;
+          afastamentos_dias: number | null;
+          ferias_dias: number | null;
+          adicional_noturno: string | null;
+          fonte: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          unit_id: string;
+          periodo: string;
+          horas_previstas?: string | null;
+          horas_trabalhadas?: string | null;
+          banco_horas_positivo?: string | null;
+          banco_horas_negativo?: string | null;
+          saldo_banco?: string | null;
+          banco_horas_acumulado?: string | null;
+          faltas_injustificadas_dias?: number | null;
+          atestado_horas?: string | null;
+          afastamentos_dias?: number | null;
+          ferias_dias?: number | null;
+          adicional_noturno?: string | null;
+          fonte?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          unit_id?: string;
+          periodo?: string;
+          horas_previstas?: string | null;
+          horas_trabalhadas?: string | null;
+          banco_horas_positivo?: string | null;
+          banco_horas_negativo?: string | null;
+          saldo_banco?: string | null;
+          banco_horas_acumulado?: string | null;
+          faltas_injustificadas_dias?: number | null;
+          atestado_horas?: string | null;
+          afastamentos_dias?: number | null;
+          ferias_dias?: number | null;
+          adicional_noturno?: string | null;
+          fonte?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+      };
+
+      vacations: {
+        Row: {
+          id: string;
+          employee_id: string;
+          unit_id: string;
+          start_date: string;
+          end_date: string;
+          acquisitive_period_start: string | null;
+          acquisitive_period_end: string | null;
+          days_entitled: number;
+          days_taken: number | null;
+          abono_days: number | null;
+          is_double_pay: boolean;
+          status: "agendada" | "em_andamento" | "concluida" | "cancelada";
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          unit_id: string;
+          start_date: string;
+          end_date: string;
+          acquisitive_period_start?: string | null;
+          acquisitive_period_end?: string | null;
+          days_entitled?: number;
+          days_taken?: number | null;
+          abono_days?: number | null;
+          is_double_pay?: boolean;
+          status?: "agendada" | "em_andamento" | "concluida" | "cancelada";
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          unit_id?: string;
+          start_date?: string;
+          end_date?: string;
+          acquisitive_period_start?: string | null;
+          acquisitive_period_end?: string | null;
+          days_entitled?: number;
+          days_taken?: number | null;
+          abono_days?: number | null;
+          is_double_pay?: boolean;
+          status?: "agendada" | "em_andamento" | "concluida" | "cancelada";
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+
+      overtime_records: {
+        Row: {
+          id: string;
+          employee_id: string;
+          unit_id: string;
+          date: string;
+          hours: string;
+          type: "50" | "100" | "banco";
+          reason: string | null;
+          approved: boolean | null;
+          approved_by: string | null;
+          periodo: string | null;
+          source: "manual" | "totvs";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          unit_id: string;
+          date: string;
+          hours: string | number;
+          type: "50" | "100" | "banco";
+          reason?: string | null;
+          approved?: boolean | null;
+          approved_by?: string | null;
+          periodo?: string | null;
+          source?: "manual" | "totvs";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          unit_id?: string;
+          date?: string;
+          hours?: string | number;
+          type?: "50" | "100" | "banco";
+          reason?: string | null;
+          approved?: boolean | null;
+          approved_by?: string | null;
+          periodo?: string | null;
+          source?: "manual" | "totvs";
+          created_at?: string;
+        };
+      };
+
+      import_logs: {
+        Row: {
+          id: string;
+          unit_id: string;
+          periodo: string;
+          tipo: "ponto" | "holerites" | "gorjetas" | "vt";
+          total_linhas: number | null;
+          importados: number | null;
+          nao_encontrados: number | null;
+          erros: number | null;
+          detalhes: Json | null;
+          imported_by: string | null;
+          imported_at: string;
+        };
+        Insert: {
+          id?: string;
+          unit_id: string;
+          periodo: string;
+          tipo: "ponto" | "holerites" | "gorjetas" | "vt";
+          total_linhas?: number | null;
+          importados?: number | null;
+          nao_encontrados?: number | null;
+          erros?: number | null;
+          detalhes?: Json | null;
+          imported_by?: string | null;
+          imported_at?: string;
+        };
+        Update: {
+          id?: string;
+          unit_id?: string;
+          periodo?: string;
+          tipo?: "ponto" | "holerites" | "gorjetas" | "vt";
+          total_linhas?: number | null;
+          importados?: number | null;
+          nao_encontrados?: number | null;
+          erros?: number | null;
+          detalhes?: Json | null;
+          imported_by?: string | null;
+          imported_at?: string;
+        };
+      };
+
+      campaigns: {
+        // Comunicação interna (saúde/evento/comunicado) target=all|department.
+        Row: {
+          id: string;
+          brand_id: string | null;
+          unit_id: string | null;
+          title: string;
+          description: string | null;
+          image_url: string | null;
+          category: "saude" | "evento" | "comunicado";
+          target: "all" | "department";
+          target_value: string | null;
+          active: boolean;
+          starts_at: string | null;
+          ends_at: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          brand_id?: string | null;
+          unit_id?: string | null;
+          title: string;
+          description?: string | null;
+          image_url?: string | null;
+          category: "saude" | "evento" | "comunicado";
+          target?: "all" | "department";
+          target_value?: string | null;
+          active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          brand_id?: string | null;
+          unit_id?: string | null;
+          title?: string;
+          description?: string | null;
+          image_url?: string | null;
+          category?: "saude" | "evento" | "comunicado";
+          target?: "all" | "department";
+          target_value?: string | null;
+          active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+      };
+
+      job_openings: {
+        Row: {
+          id: string;
+          brand_id: string;
+          unit_id: string | null;
+          title: string;
+          description: string | null;
+          is_active: boolean;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          brand_id: string;
+          unit_id?: string | null;
+          title: string;
+          description?: string | null;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          brand_id?: string;
+          unit_id?: string | null;
+          title?: string;
+          description?: string | null;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+        };
+      };
+
+      candidates: {
+        // status = decisão RH; interview_status = ciclo do app.
+        Row: {
+          id: string;
+          job_opening_id: string;
+          full_name: string;
+          email: string | null;
+          phone: string | null;
+          access_code: string;
+          status: "pendente" | "aprovado" | "reprovado";
+          interview_status: "pendente" | "em_andamento" | "concluido";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_opening_id: string;
+          full_name: string;
+          email?: string | null;
+          phone?: string | null;
+          access_code: string;
+          status?: "pendente" | "aprovado" | "reprovado";
+          interview_status?: "pendente" | "em_andamento" | "concluido";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          job_opening_id?: string;
+          full_name?: string;
+          email?: string | null;
+          phone?: string | null;
+          access_code?: string;
+          status?: "pendente" | "aprovado" | "reprovado";
+          interview_status?: "pendente" | "em_andamento" | "concluido";
+          created_at?: string;
+        };
+      };
+
+      interview_questions: {
+        Row: {
+          id: string;
+          job_opening_id: string;
+          order_num: number;
+          question_text: string;
+          video_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_opening_id: string;
+          order_num: number;
+          question_text: string;
+          video_url?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          job_opening_id?: string;
+          order_num?: number;
+          question_text?: string;
+          video_url?: string | null;
+          created_at?: string;
+        };
+      };
+
+      interview_responses: {
+        Row: {
+          id: string;
+          candidate_id: string;
+          question_id: string;
+          video_url: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          candidate_id: string;
+          question_id: string;
+          video_url: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          candidate_id?: string;
+          question_id?: string;
+          video_url?: string;
+          created_at?: string;
+        };
+      };
+
       cct_versions: {
         Row: {
           id: string;
@@ -1531,3 +2154,31 @@ export type EventWithRelations = EventRow & {
   infra_items: EventInfraItem[];
   staff: EventStaff[];
 };
+
+// ── HOS RH expansion (migrations 011–018) ─────────────────────
+export type EmployeeAuthRow = Tables<"employee_auth">;
+export type DocumentRow = Tables<"documents">;
+export type TipsRecordRow = Tables<"tips_records">;
+export type TransportVoucherRow = Tables<"transport_vouchers">;
+export type TimeRecordRow = Tables<"time_records">;
+export type VacationRow = Tables<"vacations">;
+export type OvertimeRecordRow = Tables<"overtime_records">;
+export type ImportLogRow = Tables<"import_logs">;
+export type CampaignRow = Tables<"campaigns">;
+export type JobOpeningRow = Tables<"job_openings">;
+export type CandidateRow = Tables<"candidates">;
+export type InterviewQuestionRow = Tables<"interview_questions">;
+export type InterviewResponseRow = Tables<"interview_responses">;
+
+// Enums refletindo CHECK constraints das migrations
+export type DocumentType = "RG" | "CPF" | "CTPS" | "contrato" | "exame" | "outro";
+export type TipoContrato = "CLT" | "PJ" | "temporario" | "estagiario";
+export type StatusRH = "ativo" | "inativo" | "ferias" | "afastado";
+export type VacationStatus = "agendada" | "em_andamento" | "concluida" | "cancelada";
+export type OvertimeType = "50" | "100" | "banco";
+export type OvertimeSource = "manual" | "totvs";
+export type ImportTipo = "ponto" | "holerites" | "gorjetas" | "vt";
+export type CampaignCategory = "saude" | "evento" | "comunicado";
+export type CampaignTarget = "all" | "department";
+export type CandidateStatus = "pendente" | "aprovado" | "reprovado";
+export type CandidateInterviewStatus = "pendente" | "em_andamento" | "concluido";

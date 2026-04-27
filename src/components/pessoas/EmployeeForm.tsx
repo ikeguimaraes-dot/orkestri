@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,30 @@ const ESCOLARIDADE_OPTIONS = [
 
 const RACA_OPTIONS = ["Branca", "Preta", "Parda", "Amarela", "Indígena", "Não declarada"] as const;
 const GENERO_OPTIONS = ["Masculino", "Feminino", "Outro", "Não declarado"] as const;
+
+// HOS RH expansion (migration 011)
+const ESTADO_CIVIL_OPTIONS = [
+  "Solteiro",
+  "Casado",
+  "União Estável",
+  "Divorciado",
+  "Viúvo",
+  "Separado",
+] as const;
+
+const TIPO_CONTRATO_OPTIONS = [
+  { value: "CLT", label: "CLT" },
+  { value: "PJ", label: "PJ" },
+  { value: "temporario", label: "Temporário" },
+  { value: "estagiario", label: "Estagiário" },
+] as const;
+
+const STATUS_RH_OPTIONS = [
+  { value: "ativo", label: "Ativo" },
+  { value: "inativo", label: "Inativo" },
+  { value: "ferias", label: "Em férias" },
+  { value: "afastado", label: "Afastado" },
+] as const;
 
 export function EmployeeForm(props: Props) {
   const router = useRouter();
@@ -88,6 +112,29 @@ export function EmployeeForm(props: Props) {
             conta: "",
             tipo_conta: "",
             pix: "",
+            // HOS RH expansion
+            employee_code: "",
+            esocial_code: "",
+            nome_social: "",
+            data_nascimento: "",
+            cidade_nascimento: "",
+            uf_nascimento: "",
+            pais_nascimento: "Brasil",
+            estado_civil: "",
+            tipo_contrato: "CLT",
+            jornada: "",
+            status_rh: "ativo",
+            telefone: "",
+            email: "",
+            photo_url: "",
+            contato_emergencia_nome: "",
+            contato_emergencia_tel: "",
+            zona_eleitoral: "",
+            secao_eleitoral: "",
+            rne: "",
+            rne_orgao: "",
+            rne_expedicao: "",
+            ctps_expedicao: "",
           },
   });
 
@@ -159,11 +206,69 @@ export function EmployeeForm(props: Props) {
           </Field>
         </Row>
         <Row>
-          <Field label="Função" error={errs.funcao?.message}>
-            <Input {...form.register("funcao")} placeholder="Ex: Garçom I, Cozinheiro II" />
+          <Field label="Nome social (opcional)" error={errs.nome_social?.message}>
+            <Input {...form.register("nome_social")} autoComplete="off" />
           </Field>
           <Field label="CPF (opcional)" error={errs.cpf?.message}>
             <Input {...form.register("cpf")} placeholder="000.000.000-00" />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="Função" error={errs.funcao?.message}>
+            <Input {...form.register("funcao")} placeholder="Ex: Garçom I, Cozinheiro II" />
+          </Field>
+          <Field
+            label="Código Totvs / interno"
+            error={errs.employee_code?.message}
+          >
+            <Input
+              {...form.register("employee_code")}
+              placeholder="Ex: 1234"
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="Código eSocial" error={errs.esocial_code?.message}>
+            <Input {...form.register("esocial_code")} autoComplete="off" />
+          </Field>
+        </Row>
+      </Section>
+
+      <Section title="Nascimento" desc="Origem e estado civil.">
+        <Row>
+          <Field label="Data de nascimento" error={errs.data_nascimento?.message}>
+            <Input type="date" {...form.register("data_nascimento")} />
+          </Field>
+          <Field label="Cidade" error={errs.cidade_nascimento?.message}>
+            <Input {...form.register("cidade_nascimento")} />
+          </Field>
+          <Field label="UF" error={errs.uf_nascimento?.message}>
+            <Input {...form.register("uf_nascimento")} maxLength={2} placeholder="SP" />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="País" error={errs.pais_nascimento?.message}>
+            <Input {...form.register("pais_nascimento")} />
+          </Field>
+          <Field label="Estado civil" error={errs.estado_civil?.message}>
+            <Select
+              value={form.watch("estado_civil") ?? ""}
+              onValueChange={(v) =>
+                form.setValue("estado_civil", v as EmployeeFormInput["estado_civil"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADO_CIVIL_OPTIONS.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         </Row>
       </Section>
@@ -184,6 +289,59 @@ export function EmployeeForm(props: Props) {
           </Field>
           <Field label="Data de admissão" error={errs.data_admissao?.message}>
             <Input type="date" {...form.register("data_admissao")} />
+          </Field>
+        </Row>
+        <Row>
+          <Field label="Tipo de contrato" error={errs.tipo_contrato?.message}>
+            <Select
+              value={form.watch("tipo_contrato") ?? ""}
+              onValueChange={(v) =>
+                form.setValue("tipo_contrato", v as EmployeeFormInput["tipo_contrato"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPO_CONTRATO_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field
+            label="Jornada"
+            error={errs.jornada?.message}
+          >
+            <Input
+              {...form.register("jornada")}
+              placeholder="Ex: 44h semanais, 6x1, 12x36"
+            />
+          </Field>
+          <Field label="Status RH" error={errs.status_rh?.message}>
+            <Select
+              value={form.watch("status_rh") ?? "ativo"}
+              onValueChange={(v) =>
+                form.setValue("status_rh", v as EmployeeFormInput["status_rh"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_RH_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         </Row>
         <Field label="Departamento" error={errs.departamento?.message}>
@@ -221,16 +379,45 @@ export function EmployeeForm(props: Props) {
           <Field label="CTPS UF" error={errs.ctps_uf?.message}>
             <Input {...form.register("ctps_uf")} maxLength={2} />
           </Field>
+          <Field
+            label="CTPS — data de expedição"
+            error={errs.ctps_expedicao?.message}
+          >
+            <Input type="date" {...form.register("ctps_expedicao")} />
+          </Field>
         </Row>
         <Row>
           <Field label="Título de eleitor" error={errs.titulo_eleitor?.message}>
             <Input {...form.register("titulo_eleitor")} />
           </Field>
-          <Field label="Reservista" error={errs.reservista?.message}>
-            <Input {...form.register("reservista")} />
+          <Field label="Zona eleitoral" error={errs.zona_eleitoral?.message}>
+            <Input {...form.register("zona_eleitoral")} />
+          </Field>
+          <Field label="Seção eleitoral" error={errs.secao_eleitoral?.message}>
+            <Input {...form.register("secao_eleitoral")} />
           </Field>
         </Row>
+        <Field label="Reservista" error={errs.reservista?.message}>
+          <Input {...form.register("reservista")} />
+        </Field>
       </Section>
+
+      <CollapsibleSection
+        title="Estrangeiro (RNE)"
+        desc="Preencher apenas se o colaborador for estrangeiro."
+      >
+        <Row>
+          <Field label="RNE" error={errs.rne?.message}>
+            <Input {...form.register("rne")} />
+          </Field>
+          <Field label="Órgão emissor" error={errs.rne_orgao?.message}>
+            <Input {...form.register("rne_orgao")} placeholder="PF" />
+          </Field>
+          <Field label="Data de expedição" error={errs.rne_expedicao?.message}>
+            <Input type="date" {...form.register("rne_expedicao")} />
+          </Field>
+        </Row>
+      </CollapsibleSection>
 
       <Section
         title="Endereço"
@@ -270,6 +457,54 @@ export function EmployeeForm(props: Props) {
           </Field>
           <Field label="Cidade" error={errs.cidade?.message}>
             <Input {...form.register("cidade")} />
+          </Field>
+        </Row>
+      </Section>
+
+      <Section
+        title="Contato"
+        desc="Email e telefone aparecem no app mobile do colaborador."
+      >
+        <Row>
+          <Field label="Telefone" error={errs.telefone?.message}>
+            <Input
+              {...form.register("telefone")}
+              placeholder="(11) 99999-9999"
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="Email" error={errs.email?.message}>
+            <Input
+              type="email"
+              {...form.register("email")}
+              placeholder="nome@dominio.com"
+              autoComplete="off"
+            />
+          </Field>
+        </Row>
+        <Field label="Foto (URL no bucket avatars)" error={errs.photo_url?.message}>
+          <Input
+            {...form.register("photo_url")}
+            placeholder="path no Supabase Storage (bucket avatars)"
+            autoComplete="off"
+          />
+        </Field>
+      </Section>
+
+      <Section
+        title="Contato de emergência"
+        desc="Quem chamar em caso de acidente / urgência."
+      >
+        <Row>
+          <Field label="Nome" error={errs.contato_emergencia_nome?.message}>
+            <Input {...form.register("contato_emergencia_nome")} autoComplete="off" />
+          </Field>
+          <Field label="Telefone" error={errs.contato_emergencia_tel?.message}>
+            <Input
+              {...form.register("contato_emergencia_tel")}
+              placeholder="(11) 99999-9999"
+              autoComplete="off"
+            />
           </Field>
         </Row>
       </Section>
@@ -466,6 +701,68 @@ function Section({
   );
 }
 
+/**
+ * Como Section, mas começa fechada. Usado pra blocos opcionais (Estrangeiro)
+ * que normalmente ficam vazios.
+ */
+function CollapsibleSection({
+  title,
+  desc,
+  children,
+}: {
+  title: string;
+  desc?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <fieldset
+      style={{
+        border: "1px solid var(--border)",
+        background: "var(--surface)",
+        borderRadius: 12,
+        padding: open ? "20px 22px" : "12px 22px",
+        display: "flex",
+        flexDirection: "column",
+        gap: open ? 14 : 0,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          margin: 0,
+          textAlign: "left",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          color: "var(--text)",
+        }}
+      >
+        <ChevronDown
+          size={14}
+          style={{
+            color: "var(--text-3)",
+            transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+            transition: "transform 0.2s",
+          }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{title}</span>
+      </button>
+      {open && desc && (
+        <p style={{ fontSize: 11, color: "var(--text-3)", lineHeight: 1.5, margin: 0 }}>
+          {desc}
+        </p>
+      )}
+      {open && children}
+    </fieldset>
+  );
+}
+
 function Row({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -539,5 +836,28 @@ export function employeeToFormDefaults(e: Employee): EmployeeFormInput {
         ? e.tipo_conta
         : "",
     pix: e.pix ?? "",
+    // HOS RH expansion (migration 011)
+    employee_code: e.employee_code ?? "",
+    esocial_code: e.esocial_code ?? "",
+    nome_social: e.nome_social ?? "",
+    data_nascimento: e.data_nascimento?.slice(0, 10) ?? "",
+    cidade_nascimento: e.cidade_nascimento ?? "",
+    uf_nascimento: e.uf_nascimento ?? "",
+    pais_nascimento: e.pais_nascimento ?? "Brasil",
+    estado_civil: e.estado_civil ?? "",
+    tipo_contrato: e.tipo_contrato ?? "CLT",
+    jornada: e.jornada ?? "",
+    status_rh: e.status_rh ?? "ativo",
+    telefone: e.telefone ?? "",
+    email: e.email ?? "",
+    photo_url: e.photo_url ?? "",
+    contato_emergencia_nome: e.contato_emergencia_nome ?? "",
+    contato_emergencia_tel: e.contato_emergencia_tel ?? "",
+    zona_eleitoral: e.zona_eleitoral ?? "",
+    secao_eleitoral: e.secao_eleitoral ?? "",
+    rne: e.rne ?? "",
+    rne_orgao: e.rne_orgao ?? "",
+    rne_expedicao: e.rne_expedicao?.slice(0, 10) ?? "",
+    ctps_expedicao: e.ctps_expedicao?.slice(0, 10) ?? "",
   };
 }
