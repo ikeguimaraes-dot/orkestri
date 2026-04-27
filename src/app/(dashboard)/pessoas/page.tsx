@@ -47,7 +47,7 @@ const SUB_MODULES: ReadonlyArray<SubModule> = [
     label: "Ponto",
     desc: "PWA com câmera + geolocalização. Aprovação pelo gerente.",
     icon: Clock3,
-    status: "em-construcao",
+    status: "ativo",
   },
 ];
 

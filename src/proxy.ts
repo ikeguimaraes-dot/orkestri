@@ -39,7 +39,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Tudo, exceto assets estáticos do Next.
-    "/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)",
+    // Tudo, exceto assets estáticos do Next + assets PWA (manifest e ícones
+    // precisam ser acessíveis sem auth pra browser fazer install).
+    "/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|icon-).*)",
   ],
 };

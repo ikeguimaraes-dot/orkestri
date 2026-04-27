@@ -217,6 +217,17 @@ export type EmployeeScore = {
   absences_count: number;
 };
 
+export type PunchWithEmployee = TimeClockPunch & { employee: EmployeeStub | null };
+
+/** Status agregado pra cada colaborador no dia: punches + total trabalhado. */
+export type PunchDaySummary = {
+  employee: EmployeeStub;
+  punches: TimeClockPunch[];
+  worked_minutes: number;
+  break_minutes: number;
+  pending_count: number; // punches com aprovado=null
+};
+
 export type Shift = {
   id: string;
   employee_id: string;

@@ -18,10 +18,13 @@ import type {
   Payslip,
   PayslipStatus,
   PayslipWithEmployee,
+  PunchTipo,
+  PunchWithEmployee,
   ScoreEvent,
   Shift,
   ShiftInsert,
   ShiftUpdate,
+  TimeClockPunch,
   Warning,
   WarningInsert,
   WarningNivel,
@@ -35,6 +38,7 @@ const PAYSLIPS_TABLE = "payslips" as const;
 const WARNINGS_TABLE = "warnings" as const;
 const ABSENCES_TABLE = "absences" as const;
 const SCORE_EVENTS_TABLE = "score_events" as const;
+const PUNCHES_TABLE = "time_clock_punches" as const;
 
 // Nota: o builder do @supabase/ssr infere `never` em insert/update quando
 // PostgrestVersion 12 + custom Database<T>. As entradas já estão validadas
@@ -788,3 +792,195 @@ export async function listEmployeeScores(unitId: string): Promise<EmployeeScore[
     return [];
   }
 }
+
+// ── Ponto eletrônico ───────────────────────────────────────────
+
+type PunchJoinRow = TimeClockPunch & {
+  employees: EmployeeStub | EmployeeStub[] | null;
+};
+
+export type RegisterPunchInput = {
+  employeeId: string;
+  tipo: PunchTipo;
+  latitude?: number | null;
+  longitude?: number | null;
+  deviceInfo?: string | null;
+};
+
+/**
+ * Registra um punch (entrada/saida/intervalo). RLS aceita se o user
+ * autenticado for o employee (user_id match) OU tiver role na unit.
+ */
+export async function registerPunch(
+  input: RegisterPunchInput,
+): Promise<ActionResult<TimeClockPunch>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const { data, error } = await supabase
+      .from(PUNCHES_TABLE)
+      .insert({
+        employee_id: input.employeeId,
+        tipo: input.tipo,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        device_info: input.deviceInfo ?? null,
+        timestamp_punch: new Date().toISOString(),
+      } as never)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao registrar ponto" };
+    }
+    revalidatePath("/pessoas/ponto");
+    revalidatePath("/ponto");
+    return { ok: true, data: data as TimeClockPunch };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+/** Punches de um colaborador no dia (todos os tipos, ordem cronológica). */
+export async function getTodayPunches(employeeId: string): Promise<TimeClockPunch[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+    const { data, error } = await supabase
+      .from(PUNCHES_TABLE)
+      .select("*")
+      .eq("employee_id", employeeId)
+      .gte("timestamp_punch", start)
+      .lt("timestamp_punch", end)
+      .order("timestamp_punch", { ascending: true });
+    if (error) {
+      console.error("[getTodayPunches] error:", error.message);
+      return [];
+    }
+    return (data ?? []) as TimeClockPunch[];
+  } catch (e) {
+    console.error("[getTodayPunches] exceção:", e);
+    return [];
+  }
+}
+
+/** Punches do dia inteiro pra todos colaboradores da unit (view do GM). */
+export async function listPunchesByDay(
+  unitId: string,
+  dataIso: string,
+): Promise<PunchWithEmployee[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const start = `${dataIso}T00:00:00Z`;
+    const end = `${dataIso}T23:59:59.999Z`;
+    const { data, error } = await supabase
+      .from(PUNCHES_TABLE)
+      .select("*, employees!inner(id, nome, sobrenome, funcao, departamento, unit_id)")
+      .eq("employees.unit_id", unitId)
+      .gte("timestamp_punch", start)
+      .lte("timestamp_punch", end)
+      .order("timestamp_punch", { ascending: true })
+      .returns<PunchJoinRow[]>();
+    if (error) {
+      console.error("[listPunchesByDay] error:", error.message);
+      return [];
+    }
+    return (data ?? []).map((row) => {
+      const emp = Array.isArray(row.employees) ? row.employees[0] ?? null : row.employees;
+      return { ...row, employee: emp ?? null } as PunchWithEmployee;
+    });
+  } catch (e) {
+    console.error("[listPunchesByDay] exceção:", e);
+    return [];
+  }
+}
+
+async function setPunchApproval(
+  id: string,
+  aprovado: boolean,
+): Promise<ActionResult<TimeClockPunch>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { data, error } = await supabase
+      .from(PUNCHES_TABLE)
+      .update({ aprovado } as never)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) {
+      return { ok: false, error: error?.message ?? "Falha ao atualizar status" };
+    }
+    revalidatePath("/pessoas/ponto");
+    return { ok: true, data: data as TimeClockPunch };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+export async function approvePunch(id: string): Promise<ActionResult<TimeClockPunch>> {
+  return setPunchApproval(id, true);
+}
+
+export async function rejectPunch(id: string): Promise<ActionResult<TimeClockPunch>> {
+  return setPunchApproval(id, false);
+}
+
+/** Aprova todos os punches pendentes (aprovado IS NULL) da unit num dia. */
+export async function approveAllPendingPunches(
+  unitId: string,
+  dataIso: string,
+): Promise<ActionResult<{ count: number }>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    // Postgrest não suporta filtro por employees.unit_id em UPDATE direto.
+    // Buscar IDs primeiro (já filtrados via join), depois update IN.
+    const punches = await listPunchesByDay(unitId, dataIso);
+    const pendingIds = punches.filter((p) => p.aprovado === null).map((p) => p.id);
+    if (pendingIds.length === 0) return { ok: true, data: { count: 0 } };
+    const { error } = await supabase
+      .from(PUNCHES_TABLE)
+      .update({ aprovado: true } as never)
+      .in("id", pendingIds);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/pessoas/ponto");
+    return { ok: true, data: { count: pendingIds.length } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+/** Lookup employee pelo user_id da sessão (rota /ponto). */
+export async function getMyEmployee(): Promise<Employee | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return null;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("ativo", true)
+      .maybeSingle();
+    if (error) {
+      console.error("[getMyEmployee] error:", error.message);
+      return null;
+    }
+    return (data as Employee | null) ?? null;
+  } catch (e) {
+    console.error("[getMyEmployee] exceção:", e);
+    return null;
+  }
+}
+
+// Helpers puros (calcWorkHours, nextPunchTipo, formatters) moraram aqui mas
+// foram movidos pra src/lib/pessoas/punch.ts — em arquivo "use server" todos
+// os exports viram Server Actions (RPC), o que quebraria o relógio do client.
