@@ -2,11 +2,7 @@ import Link from "next/link";
 import { LogOut, UserX } from "lucide-react";
 
 import { PontoApp } from "@/components/ponto/PontoApp";
-import {
-  getMyEmployee,
-  getSessionTokens,
-  getTodayPunches,
-} from "@/lib/pessoas/actions";
+import { getMyEmployee, getTodayPunches } from "@/lib/pessoas/actions";
 import { requireUser } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +15,7 @@ export default async function PontoPage() {
     return <NoEmployeeBound email={user.email} />;
   }
 
-  const [punches, tokens] = await Promise.all([
-    getTodayPunches(employee.id),
-    getSessionTokens(),
-  ]);
+  const punches = await getTodayPunches(employee.id);
 
   return (
     <PontoApp
@@ -30,8 +23,6 @@ export default async function PontoPage() {
       employeeName={`${employee.nome} ${employee.sobrenome}`.trim()}
       employeeFuncao={employee.funcao}
       initialPunches={punches}
-      initialAccessToken={tokens?.accessToken ?? null}
-      initialRefreshToken={tokens?.refreshToken ?? null}
     />
   );
 }

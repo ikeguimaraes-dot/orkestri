@@ -15,7 +15,7 @@ import {
 
 import { CameraCapture } from "@/components/ponto/CameraCapture";
 import { useDeviceInfo, useGeolocation } from "@/components/ponto/useGeolocation";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { registrarPunch } from "@/lib/pessoas/ponto-actions";
 import {
   PUNCH_BUTTON_LABEL,
   PUNCH_COLOR,
@@ -39,25 +39,16 @@ type SuccessState = { punch: TimeClockPunch; at: number } | null;
 
 type DebugLine = { ts: string; tag: string; data: unknown };
 
-function tokenPreview(t: string | null | undefined): string {
-  if (!t) return "(null)";
-  return `${t.slice(0, 20)}…(${t.length} chars)`;
-}
-
 export function PontoApp({
   employeeId,
   employeeName,
   employeeFuncao,
   initialPunches,
-  initialAccessToken,
-  initialRefreshToken,
 }: {
   employeeId: string;
   employeeName: string;
   employeeFuncao: string;
   initialPunches: TimeClockPunch[];
-  initialAccessToken: string | null;
-  initialRefreshToken: string | null;
 }) {
   // Lê ?debug=1 do window — evita Suspense boundary do useSearchParams.
   const [debugMode, setDebugMode] = useState(false);
@@ -92,57 +83,20 @@ export function PontoApp({
     return () => clearInterval(t);
   }, []);
 
-  // Seeda a session no browser client. Crítico pra iOS PWA standalone:
-  // o cookie SSR pode não estar acessível ao document.cookie do PWA, então
-  // o server passa os tokens explicitamente e nós salvamos no storage local
-  // (localStorage do @supabase/ssr) via setSession().
+  // Mount diagnostic — sem seed de tokens. O insert agora é Server Action,
+  // não browser client; auth via cookie SSR (que sempre funciona, prova:
+  // getMyEmployee server-side já carrega o employee correto).
   useEffect(() => {
     pushDebug("mount", {
       employeeId,
-      hasAccessToken: !!initialAccessToken,
-      hasRefreshToken: !!initialRefreshToken,
-      accessTokenPreview: tokenPreview(initialAccessToken),
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
       isStandalone:
         typeof window !== "undefined" && window.matchMedia
           ? window.matchMedia("(display-mode: standalone)").matches
           : null,
     });
-    if (!initialAccessToken || !initialRefreshToken) {
-      pushDebug("seed.skip", "no tokens from server");
-      return;
-    }
-    const c = getBrowserClient();
-    if (!c) {
-      pushDebug("seed.skip", "no browser client");
-      return;
-    }
-    (async () => {
-      const set = await c.auth.setSession({
-        access_token: initialAccessToken,
-        refresh_token: initialRefreshToken,
-      });
-      pushDebug("seed.setSession", {
-        ok: !!set.data.session,
-        userId: set.data.user?.id ?? null,
-        error: set.error?.message ?? null,
-      });
-      const cur = await c.auth.getSession();
-      pushDebug("seed.getSession", {
-        ok: !!cur.data.session,
-        userId: cur.data.session?.user.id ?? null,
-        accessPreview: tokenPreview(cur.data.session?.access_token ?? null),
-      });
-      const u = await c.auth.getUser();
-      pushDebug("seed.getUser", {
-        uid: u.data.user?.id ?? null,
-        email: u.data.user?.email ?? null,
-        error: u.error?.message ?? null,
-      });
-    })();
-    // pushDebug intentionally not in deps — debugMode/setDebugLog stable for the lifetime
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialAccessToken, initialRefreshToken]);
+  }, []);
 
   // Auto-dismiss do banner de sucesso
   useEffect(() => {
@@ -190,101 +144,34 @@ export function PontoApp({
       const lat = geoState.status === "ok" ? geoState.lat : null;
       const lng = geoState.status === "ok" ? geoState.lng : null;
 
-      // INSERT direto via Supabase browser client — sem hop pelo server.
-      // RLS da policy `punches_insert` (migration 006) cobre self via
-      // `e.user_id = auth.uid()`.
-      //
-      // Em iOS PWA standalone, o storage local pode estar vazio mesmo com
-      // o cookie SSR válido. Cascata de fallbacks pra garantir que o client
-      // tenha session em memória antes do insert:
-      //   1) getSession() — caminho normal
-      //   2) refreshSession() — usa refresh_token se disponível
-      //   3) setSession() com os tokens passados pelo server na primeira render
-      const browserClient = getBrowserClient();
-      if (!browserClient) {
-        pushDebug("punch.abort", "no browser client");
-        setError("Supabase indisponível");
-        return;
-      }
-
-      let session = (await browserClient.auth.getSession()).data.session;
-      pushDebug("punch.getSession", {
-        ok: !!session,
-        userId: session?.user.id ?? null,
-        accessPreview: tokenPreview(session?.access_token ?? null),
-      });
-      if (!session) {
-        const refreshed = await browserClient.auth.refreshSession();
-        session = refreshed.data.session ?? null;
-        pushDebug("punch.refreshSession", {
-          ok: !!session,
-          userId: session?.user.id ?? null,
-          error: refreshed.error?.message ?? null,
-        });
-      }
-      if (!session && initialAccessToken && initialRefreshToken) {
-        const set = await browserClient.auth.setSession({
-          access_token: initialAccessToken,
-          refresh_token: initialRefreshToken,
-        });
-        session = set.data.session ?? null;
-        pushDebug("punch.setSessionFallback", {
-          ok: !!session,
-          userId: session?.user.id ?? null,
-          error: set.error?.message ?? null,
-        });
-      }
-      if (!session) {
-        pushDebug("punch.abort", "no session after cascade");
-        setError(
-          "Sua sessão expirou. Toque pra recarregar e fazer login novamente.",
-        );
-        return;
-      }
-
-      const u = await browserClient.auth.getUser();
-      pushDebug("punch.getUser", {
-        uid: u.data.user?.id ?? null,
-        email: u.data.user?.email ?? null,
-        error: u.error?.message ?? null,
-      });
-
+      // INSERT via Server Action (auth cookie + service_role bypassa RLS).
+      // Caller é validado server-side: cookie identifica o user, action
+      // confere se ele é dono do employeeId ou tem role na unit dele.
+      // Browser client/setSession não tocados — não dependemos de localStorage.
       const payload = {
-        employee_id: employeeId,
+        employeeId,
         tipo: next,
         latitude: lat,
         longitude: lng,
-        device_info: deviceInfo,
-        timestamp_punch: new Date().toISOString(),
+        deviceInfo,
       };
       pushDebug("punch.payload", payload);
 
-      const { data: inserted, error: insErr } = await browserClient
-        .from("time_clock_punches")
-        .insert(payload as never)
-        .select()
-        .single();
+      const result = await registrarPunch(payload);
 
-      pushDebug("punch.insert", {
-        ok: !!inserted && !insErr,
-        data: inserted ? { id: (inserted as { id: string }).id } : null,
-        error: insErr
-          ? {
-              code: insErr.code,
-              message: insErr.message,
-              details: insErr.details,
-              hint: insErr.hint,
-            }
-          : null,
+      pushDebug("punch.result", {
+        ok: result.ok,
+        error: result.ok ? null : result.error,
+        id: result.ok ? result.data.id : null,
       });
 
-      if (insErr || !inserted) {
-        setError(insErr?.message ?? "Falha ao registrar ponto");
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
 
-      // Optimistic update — sem router.refresh() pra não invalidar a sessão.
-      const punch = inserted as TimeClockPunch;
+      // Optimistic update — sem router.refresh() pra não invalidar nada.
+      const punch = result.data;
       setPunches((prev) => [...prev, punch]);
       setSuccess({ punch, at: Date.now() });
     });
@@ -323,9 +210,6 @@ export function PontoApp({
           context={{
             employeeId,
             employeeName,
-            hasInitialAccessToken: !!initialAccessToken,
-            hasInitialRefreshToken: !!initialRefreshToken,
-            initialAccessPreview: tokenPreview(initialAccessToken),
           }}
         />
       )}
