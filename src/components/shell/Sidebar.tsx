@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Wallet, Users, BookOpen, ShoppingCart,
   MessageSquare, Brain, Megaphone, CalendarDays,
-  Plane, Briefcase, Building2,
+  Plane, Briefcase, Building2, Upload,
   ChevronDown, Check, LogOut,
 } from "lucide-react";
 import { useAuth, useUnit } from "@/lib/auth/context";
@@ -17,6 +17,7 @@ const NAV = [
   { href: "/financeiro",    label: "Financeiro",    icon: Wallet },
   { href: "/pessoas/colaboradores", label: "Pessoas", icon: Users },
   { href: "/pessoas/ferias", label: "Férias",       icon: Plane },
+  { href: "/pessoas/importacao", label: "Importação", icon: Upload },
   { href: "/cardapio",      label: "Cardápio",      icon: BookOpen },
   { href: "/compras",       label: "Compras",       icon: ShoppingCart },
   { href: "/cliente",       label: "Cliente",       icon: MessageSquare },
