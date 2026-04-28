@@ -2404,6 +2404,39 @@ export type Database = {
           created_at?: string;
         };
       };
+      // ── Notificações in-app (migration 024) ──────────────────
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          tipo: string;
+          titulo: string;
+          mensagem: string | null;
+          link: string | null;
+          lida: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          tipo: string;
+          titulo: string;
+          mensagem?: string | null;
+          link?: string | null;
+          lida?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          tipo?: string;
+          titulo?: string;
+          mensagem?: string | null;
+          link?: string | null;
+          lida?: boolean;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       // ── Fase E3 / Dashboard ──────────────────────────────────
@@ -2705,3 +2738,6 @@ export type PerformanceReviewRow = Tables<"performance_reviews">;
 // ── Metas por marca (migration 023) ───────────────────────────
 export type BrandTargetRow = Tables<"brand_targets">;
 export type TargetNoteRow = Tables<"target_notes">;
+
+// ── Notificações in-app (migration 024) ───────────────────────
+export type NotificationRow = Tables<"notifications">;

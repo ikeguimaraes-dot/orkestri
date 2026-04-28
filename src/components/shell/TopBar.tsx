@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import { useAuth } from "@/lib/auth/context";
+import { NotificationBell } from "@/components/shell/NotificationBell";
 
 function firstName(email: string | null | undefined): string {
   if (!email) return "operador";
@@ -74,15 +75,7 @@ export function TopBar() {
         }}>⌘K</span>
       </button>
 
-      <button title="Notificações" style={{
-        position: "relative", width: 36, height: 36, borderRadius: 8,
-        background: "transparent", border: "1px solid var(--border)",
-        color: "var(--text-2)", cursor: "pointer",
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        transition: "border-color var(--t), color var(--t)",
-      }}>
-        <Bell size={16} />
-      </button>
+      <NotificationBell />
     </header>
   );
 }

@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/server";
+import { createNotification } from "@/lib/notifications/actions";
 import type { ActionResult } from "@/lib/result";
 import {
   purchaseOrderCreateSchema,
@@ -346,9 +347,21 @@ export async function updatePurchaseOrderStatus(
   status: PurchaseOrderStatus,
 ): Promise<ActionResult<PurchaseOrder>> {
   try {
-    await requireUser();
+    const user = await requireUser();
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    // Estado anterior pra detectar transição real (e não notificar quando
+    // a mudança é redundante).
+    const { data: prev } = await supabase
+      .from(PO_TABLE)
+      .select("status, created_by, numero")
+      .eq("id", id)
+      .maybeSingle();
+    const prevRow = prev as
+      | { status: string; created_by: string | null; numero: number | null }
+      | null;
+
     const { data, error } = await supabase
       .from(PO_TABLE)
       .update({ status } as never)
@@ -356,9 +369,31 @@ export async function updatePurchaseOrderStatus(
       .select()
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+
+    const po = data as PurchaseOrder;
+
+    // Notifica created_by se status realmente mudou e a transição não foi
+    // disparada por ele mesmo (evita spam pra quem fez a ação).
+    if (
+      prevRow &&
+      prevRow.status !== status &&
+      prevRow.created_by &&
+      prevRow.created_by !== user.id
+    ) {
+      const numeroLabel =
+        prevRow.numero != null ? `#${prevRow.numero}` : id.slice(0, 8);
+      await createNotification(
+        prevRow.created_by,
+        "pedido_compra_status",
+        `Pedido ${numeroLabel} agora ${status}`,
+        `Status anterior: ${prevRow.status}`,
+        `/compras/${id}`,
+      );
+    }
+
     revalidatePath("/compras");
     revalidatePath(`/compras/${id}`);
-    return { ok: true, data: data as PurchaseOrder };
+    return { ok: true, data: po };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
   }

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/server";
+import { createNotification } from "@/lib/notifications/actions";
 import type { ActionResult } from "@/lib/result";
 import {
   performanceReviewSchema,
@@ -413,6 +414,14 @@ export async function updatePerformanceReview(
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { ok: false, error: "Supabase indisponível" };
 
+    // Estado anterior pra detectar transição rascunho → concluida/aprovada
+    const { data: prev } = await supabase
+      .from(T_REV)
+      .select("status, employee_id")
+      .eq("id", id)
+      .maybeSingle();
+    const prevStatus = (prev as { status: string } | null)?.status ?? null;
+
     const { data, error } = await supabase
       .from(T_REV)
       .update(parsed.data as never)
@@ -421,14 +430,52 @@ export async function updatePerformanceReview(
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidatePath("/pessoas/avaliacoes");
-    if (data) {
-      revalidatePath(
-        `/pessoas/colaboradores/${(data as PerformanceReview).employee_id}`,
-      );
+    const review = data as PerformanceReview;
+
+    // Notificação: rascunho → concluida/aprovada notifica o avaliado.
+    // Concluida → aprovada também notifica (mudança meaningful).
+    const newStatus = review.status;
+    const transitioned =
+      prevStatus !== newStatus &&
+      (newStatus === "concluida" || newStatus === "aprovada");
+    if (transitioned) {
+      await notifyAvaliado(supabase, review);
     }
-    return { ok: true, data: data as PerformanceReview };
+
+    revalidatePath("/pessoas/avaliacoes");
+    revalidatePath(`/pessoas/colaboradores/${review.employee_id}`);
+    return { ok: true, data: review };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+/** Lookup employee.user_id e dispara notificação. Best-effort — não falha o action. */
+async function notifyAvaliado(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  review: PerformanceReview,
+): Promise<void> {
+  try {
+    const { data: emp } = await supabase
+      .from("employees")
+      .select("user_id, nome")
+      .eq("id", review.employee_id)
+      .maybeSingle();
+    const employee = emp as { user_id: string | null; nome: string } | null;
+    if (!employee?.user_id) return;
+    const titulo =
+      review.status === "aprovada"
+        ? "Avaliação aprovada"
+        : "Avaliação concluída";
+    const mensagem = `Sua avaliação de ${review.periodo} foi ${review.status === "aprovada" ? "aprovada" : "concluída"}.`;
+    await createNotification(
+      employee.user_id,
+      "avaliacao_concluida",
+      titulo,
+      mensagem,
+      `/pessoas/colaboradores/${review.employee_id}?tab=avaliacoes`,
+    );
+  } catch (e) {
+    console.warn("[notifyAvaliado] falha:", e);
   }
 }

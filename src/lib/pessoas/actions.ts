@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/server";
+import { createNotification } from "@/lib/notifications/actions";
 import type { ActionResult } from "@/lib/result";
 import { gerarHolerite } from "@/lib/pessoas/clt";
 import type {
@@ -1548,7 +1549,29 @@ export async function updateVacationStatus(
   id: string,
   status: VacationStatus,
 ): Promise<ActionResult<Vacation>> {
-  return updateVacation(id, { status });
+  const r = await updateVacation(id, { status });
+  if (r.ok) {
+    // Best-effort notification pra created_by quando status vira aprovada
+    // (em_andamento) ou rejeitada (cancelada). Se created_by IS NULL
+    // (férias criada via app), não notifica — limitação conhecida.
+    const v = r.data;
+    if (
+      v.created_by &&
+      (status === "em_andamento" || status === "cancelada")
+    ) {
+      const titulo =
+        status === "em_andamento" ? "Férias aprovada" : "Férias rejeitada";
+      const mensagem = `Período: ${v.start_date} → ${v.end_date}`;
+      await createNotification(
+        v.created_by,
+        status === "em_andamento" ? "ferias_aprovada" : "ferias_rejeitada",
+        titulo,
+        mensagem,
+        `/pessoas/ferias`,
+      );
+    }
+  }
+  return r;
 }
 
 export async function deleteVacation(id: string): Promise<ActionResult<null>> {
