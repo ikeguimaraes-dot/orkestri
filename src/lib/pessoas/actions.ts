@@ -290,6 +290,114 @@ export async function deleteShift(id: string): Promise<ActionResult<null>> {
 }
 
 /**
+ * Copia turnos da semana anterior pra a semana iniciada em `weekStartIso`.
+ * Mantém colaborador, horários, tipo e observação — apenas desloca a data
+ * em +7 dias. Não duplica turnos que já existam na semana destino (mesma
+ * tupla employee+data).
+ */
+export async function copyShiftsFromPreviousWeek(
+  unitId: string,
+  weekStartIso: string,
+): Promise<ActionResult<{ copied: number; skipped: number }>> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const start = new Date(`${weekStartIso}T00:00:00Z`);
+    if (Number.isNaN(start.getTime())) {
+      return { ok: false, error: "Data inválida" };
+    }
+    const prevStart = new Date(start);
+    prevStart.setUTCDate(start.getUTCDate() - 7);
+    const prevEnd = new Date(start);
+    prevEnd.setUTCDate(start.getUTCDate() - 1);
+
+    const prevStartIso = prevStart.toISOString().slice(0, 10);
+    const prevEndIso = prevEnd.toISOString().slice(0, 10);
+    const currEndIso = new Date(start.getTime() + 6 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+
+    // 1) shifts da semana anterior
+    const { data: prev, error: prevErr } = await supabase
+      .from(SHIFTS_TABLE)
+      .select("*")
+      .eq("unit_id", unitId)
+      .gte("data", prevStartIso)
+      .lte("data", prevEndIso);
+    if (prevErr) return { ok: false, error: prevErr.message };
+    if (!prev || prev.length === 0) {
+      return { ok: true, data: { copied: 0, skipped: 0 } };
+    }
+
+    // 2) shifts da semana atual (pra evitar duplicar tuplas (employee, data))
+    const { data: curr, error: currErr } = await supabase
+      .from(SHIFTS_TABLE)
+      .select("employee_id, data")
+      .eq("unit_id", unitId)
+      .gte("data", weekStartIso)
+      .lte("data", currEndIso);
+    if (currErr) return { ok: false, error: currErr.message };
+    const existingKeys = new Set(
+      (curr ?? []).map(
+        (r) =>
+          `${(r as { employee_id: string }).employee_id}|${(r as { data: string }).data}`,
+      ),
+    );
+
+    type PrevRow = {
+      employee_id: string;
+      unit_id: string;
+      data: string;
+      hora_inicio: string;
+      hora_fim: string;
+      tipo: string | null;
+      labor_cost: string | null;
+      observacao: string | null;
+    };
+
+    let skipped = 0;
+    const inserts: PrevRow[] = [];
+    for (const row of prev as PrevRow[]) {
+      const d = new Date(`${row.data}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 7);
+      const newData = d.toISOString().slice(0, 10);
+      const key = `${row.employee_id}|${newData}`;
+      if (existingKeys.has(key)) {
+        skipped += 1;
+        continue;
+      }
+      existingKeys.add(key);
+      inserts.push({
+        employee_id: row.employee_id,
+        unit_id: row.unit_id,
+        data: newData,
+        hora_inicio: row.hora_inicio,
+        hora_fim: row.hora_fim,
+        tipo: row.tipo,
+        labor_cost: row.labor_cost,
+        observacao: row.observacao,
+      });
+    }
+
+    if (inserts.length > 0) {
+      const { error: insErr } = await supabase
+        .from(SHIFTS_TABLE)
+        .insert(inserts as never);
+      if (insErr) return { ok: false, error: insErr.message };
+    }
+
+    revalidatePath("/pessoas/escala");
+    return { ok: true, data: { copied: inserts.length, skipped } };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Erro inesperado",
+    };
+  }
+}
+
+/**
  * Soft delete: marca ativo=false e seta data_demissao = hoje.
  * Não remove a row — preserva histórico de holerites/turnos.
  */

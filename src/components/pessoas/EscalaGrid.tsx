@@ -12,13 +12,18 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  AlertTriangle,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Copy,
   GripVertical,
+  Loader2,
   Pencil,
   Plus,
   Trash2,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -42,6 +47,7 @@ import {
 } from "@/components/ui/dialog";
 
 import {
+  copyShiftsFromPreviousWeek,
   createShift,
   deleteShift,
   updateShift,
@@ -121,15 +127,18 @@ export function EscalaGrid({
     return m;
   }, [shifts]);
 
-  // Totais por dia + semana.
+  // Totais por dia + semana + horas por colaborador (alerta HE >44h).
   const totals = useMemo(() => {
     const perDay = days.map(() => ({ horas: 0, custo: 0 }));
+    const perEmployee = new Map<string, number>();
     let weekHoras = 0;
     let weekCusto = 0;
+    let escaladosSet = new Set<string>();
     for (const s of shifts) {
       const emp = employeeById.get(s.employee_id);
       if (!emp) continue;
       if (s.tipo === "folga") continue;
+      escaladosSet.add(s.employee_id);
       const horas = hoursWorked(s.hora_inicio, s.hora_fim);
       const custo = calculateLaborCost(emp.salario_base, s.hora_inicio, s.hora_fim);
       const dayIdx = days.findIndex((d) => isSameDay(d, parseISO(s.data)));
@@ -142,8 +151,25 @@ export function EscalaGrid({
       }
       weekHoras += horas;
       weekCusto += custo;
+      perEmployee.set(
+        s.employee_id,
+        (perEmployee.get(s.employee_id) ?? 0) + horas,
+      );
     }
-    return { perDay, weekHoras, weekCusto };
+    // Risco HE: quem passou de 44h/semana planejadas.
+    const heRiskIds = new Set<string>();
+    for (const [empId, h] of perEmployee.entries()) {
+      if (h > 44) heRiskIds.add(empId);
+    }
+    return {
+      perDay,
+      weekHoras,
+      weekCusto,
+      escalados: escaladosSet.size,
+      heRisk: heRiskIds.size,
+      heRiskIds,
+      perEmployee,
+    };
   }, [shifts, days, employeeById]);
 
   const navigateWeek = (offsetDays: number) => {
@@ -357,8 +383,64 @@ export function EscalaGrid({
     { locale: ptBR },
   )}`;
 
+  // Copiar semana anterior
+  const [copying, setCopying] = useState(false);
+  function handleCopyWeek() {
+    if (
+      !window.confirm(
+        "Copiar todos os turnos da semana anterior? Turnos já existentes na semana atual serão preservados.",
+      )
+    )
+      return;
+    setCopying(true);
+    startTransition(async () => {
+      const r = await copyShiftsFromPreviousWeek(unitId, weekStartIso);
+      setCopying(false);
+      if (!r.ok) {
+        alert(`Falha ao copiar: ${r.error}`);
+        return;
+      }
+      alert(
+        `Copiados ${r.data.copied} turno(s)${
+          r.data.skipped > 0 ? ` · ${r.data.skipped} pulados (já existiam)` : ""
+        }.`,
+      );
+      router.refresh();
+    });
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* KPI cards */}
+      <div
+        style={{
+          display: "grid",
+          gap: 10,
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        }}
+      >
+        <KpiCard
+          label="Escalados na semana"
+          value={String(totals.escalados)}
+          hint={`de ${employees.length} ativos`}
+          icon={<Users size={12} />}
+        />
+        <KpiCard
+          label="Custo estimado semana"
+          value={formatBRL(totals.weekCusto)}
+          hint={`${totals.weekHoras.toFixed(1)}h planejadas`}
+          icon={<TrendingUp size={12} />}
+          tone="brand"
+        />
+        <KpiCard
+          label="Risco de hora extra"
+          value={String(totals.heRisk)}
+          hint="colaboradores acima de 44h"
+          icon={<AlertTriangle size={12} />}
+          tone={totals.heRisk > 0 ? "warn" : "ok"}
+        />
+      </div>
+
       {/* Toolbar: navegação + totais */}
       <div
         style={{
@@ -373,7 +455,7 @@ export function EscalaGrid({
           borderRadius: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <Button variant="outline" size="sm" onClick={() => navigateWeek(-7)}>
             <ChevronLeft className="h-4 w-4" />
             Semana
@@ -385,6 +467,20 @@ export function EscalaGrid({
           <Button variant="outline" size="sm" onClick={() => navigateWeek(7)}>
             Semana
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyWeek}
+            disabled={copying}
+            title="Duplica turnos da semana anterior pra esta semana"
+          >
+            {copying ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Copy className="mr-2 h-3.5 w-3.5" />
+            )}
+            Copiar semana anterior
           </Button>
           <span
             style={{
@@ -496,6 +592,8 @@ export function EscalaGrid({
               shiftsByCell={shiftsByCell}
               dragOverKey={dragOverKey}
               pendingShiftId={pendingShiftId}
+              weekHours={totals.perEmployee.get(emp.id) ?? 0}
+              heRisk={totals.heRiskIds.has(emp.id)}
               onCellClick={openCreate}
               onShiftClick={openEdit}
               onDragStart={handleDragStart}
@@ -568,6 +666,8 @@ function EmployeeRow({
   shiftsByCell,
   dragOverKey,
   pendingShiftId,
+  weekHours,
+  heRisk,
   onCellClick,
   onShiftClick,
   onDragStart,
@@ -580,6 +680,8 @@ function EmployeeRow({
   shiftsByCell: Map<string, Shift[]>;
   dragOverKey: string | null;
   pendingShiftId: string | null;
+  weekHours: number;
+  heRisk: boolean;
   onCellClick: (employeeId: string, data: string) => void;
   onShiftClick: (shift: Shift) => void;
   onDragStart: (e: React.DragEvent, shift: Shift) => void;
@@ -589,6 +691,9 @@ function EmployeeRow({
 }) {
   const fullName = `${employee.nome} ${employee.sobrenome}`.trim();
   const color = avatarColor(fullName);
+  const rowTint = heRisk
+    ? "color-mix(in srgb, #F59E0B 8%, var(--surface))"
+    : "var(--surface)";
 
   return (
     <>
@@ -600,11 +705,12 @@ function EmployeeRow({
           alignItems: "center",
           gap: 10,
           minHeight: 64,
-          background: "var(--surface)",
+          background: rowTint,
           position: "sticky",
           left: 0,
           zIndex: 1,
         }}
+        title={heRisk ? `Risco de HE — ${weekHours.toFixed(1)}h planejadas (limite 44h)` : undefined}
       >
         <div
           style={{
@@ -623,7 +729,7 @@ function EmployeeRow({
         >
           {initials(fullName)}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
           <span
             style={{
               fontSize: 12,
@@ -632,11 +738,24 @@ function EmployeeRow({
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             {fullName}
+            {heRisk && (
+              <AlertTriangle
+                size={11}
+                style={{ color: "#A16207", flexShrink: 0 }}
+                aria-label="Risco de HE"
+              />
+            )}
           </span>
-          <span style={{ fontSize: 10, color: "var(--text-3)" }}>{employee.funcao}</span>
+          <span style={{ fontSize: 10, color: heRisk ? "#A16207" : "var(--text-3)" }}>
+            {employee.funcao}
+            {weekHours > 0 ? ` · ${weekHours.toFixed(1)}h` : ""}
+          </span>
         </div>
       </div>
       {days.map((d, i) => {
@@ -977,6 +1096,75 @@ function PreviewCost({
         <span style={{ color: "var(--text-3)" }}>Custo estimado: </span>
         <strong style={{ color: "var(--brand)" }}>{formatBRL(custo)}</strong>
       </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  icon,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+  tone?: "neutral" | "ok" | "warn" | "brand";
+}) {
+  const fg =
+    tone === "warn"
+      ? "#A16207"
+      : tone === "ok"
+      ? "#15803D"
+      : tone === "brand"
+      ? "var(--brand)"
+      : "var(--text)";
+  const bg =
+    tone === "warn"
+      ? "color-mix(in srgb, #F59E0B 6%, var(--surface))"
+      : "var(--surface)";
+  return (
+    <div
+      style={{
+        background: bg,
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        padding: 14,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--text-3)",
+          textTransform: "uppercase",
+          letterSpacing: 0.6,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        {icon}
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 700,
+          color: fg,
+          marginTop: 4,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+      {hint && (
+        <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+          {hint}
+        </div>
+      )}
     </div>
   );
 }
