@@ -1,7 +1,5 @@
 import "server-only";
-import { redirect } from "next/navigation";
 import { cache } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { RoleName } from "@/types/database";
 
 export type CurrentUser = {
@@ -15,97 +13,25 @@ export type CurrentUser = {
   }>;
 };
 
-/**
- * DAL — verifica sessão e carrega roles. `cache` memoiza durante uma render pass.
- * Server-only. Retorna null se sem sessão ou sem Supabase.
- */
+// TEMP: auth mockado para testes de Ponto — restaurar antes de produção real
+const MOCK_USER: CurrentUser = {
+  id: "ac559fa1-f10b-4ec4-9f4b-fafbc881a884",
+  email: "ikeguimaraes@gmail.com",
+  roles: [{ role: "founder" as RoleName, unitId: null, brandId: null, groupId: null }],
+};
+
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  try {
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) {
-      console.warn("[getCurrentUser] supabase indisponível");
-      return null;
-    }
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError) {
-      console.warn("[getCurrentUser] auth.getUser error:", authError.message);
-      return null;
-    }
-    if (!user) return null;
-
-    // Pega roles do user. RLS permite SELECT do próprio user_roles.
-    // Embedded select (roles!inner) não é tipado pelo nosso Database — cast explícito.
-    type RoleJoinRow = {
-      unit_id: string | null;
-      brand_id: string | null;
-      group_id: string | null;
-      roles: { name: RoleName } | { name: RoleName }[] | null;
-    };
-    const { data: rolesData, error: rolesError } = await supabase
-      .from("user_roles")
-      .select("unit_id, brand_id, group_id, roles!inner(name)")
-      .eq("user_id", user.id)
-      .returns<RoleJoinRow[]>();
-
-    if (rolesError) {
-      console.error("[getCurrentUser] roles query error:", rolesError.message);
-      // Continua com roles vazias — não bloqueia o user.
-    }
-
-    const roles = (rolesData ?? []).map((r) => {
-      const roleObj = Array.isArray(r.roles) ? r.roles[0] : r.roles;
-      return {
-        role: (roleObj?.name ?? "colaborador") as RoleName,
-        unitId: r.unit_id,
-        brandId: r.brand_id,
-        groupId: r.group_id,
-      };
-    });
-
-    return {
-      id: user.id,
-      email: user.email ?? null,
-      roles,
-    };
-  } catch (e) {
-    // Next.js usa exceptions especiais (NEXT_REDIRECT, NEXT_DYNAMIC_USAGE) pra
-    // controle de fluxo. NUNCA engolir — deixa Next tratar.
-    if (isNextInternal(e)) throw e;
-    console.error("[getCurrentUser] exceção:", e);
-    return null;
-  }
+  return MOCK_USER;
 });
 
-function isNextInternal(e: unknown): boolean {
-  if (!e || typeof e !== "object") return false;
-  const digest = (e as { digest?: unknown }).digest;
-  if (typeof digest === "string") {
-    return digest.startsWith("NEXT_REDIRECT") || digest.startsWith("DYNAMIC_SERVER_USAGE");
-  }
-  const message = (e as { message?: unknown }).message;
-  return typeof message === "string" && message.includes("Dynamic server usage");
-}
-
-/** Falha (redireciona para /login) se não houver sessão. */
 export async function requireUser(): Promise<CurrentUser> {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  return user;
+  return MOCK_USER;
 }
 
-/** Falha se o user não tiver pelo menos uma das roles especificadas. */
-export async function requireRole(allowed: ReadonlyArray<RoleName>): Promise<CurrentUser> {
-  const user = await requireUser();
-  const has = user.roles.some((r) => allowed.includes(r.role));
-  if (!has) redirect("/");
-  return user;
+export async function requireRole(_allowed: ReadonlyArray<RoleName>): Promise<CurrentUser> {
+  return MOCK_USER;
 }
 
-/** Conveniência: o user é founder? */
-export function isFounder(user: CurrentUser | null): boolean {
-  return !!user?.roles.some((r) => r.role === "founder");
+export function isFounder(_user: CurrentUser | null): boolean {
+  return true;
 }

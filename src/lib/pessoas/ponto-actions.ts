@@ -31,6 +31,7 @@ export type RegistrarPunchInput = {
   latitude?: number | null;
   longitude?: number | null;
   deviceInfo?: string | null;
+  photoBase64?: string | null;
 };
 
 const VALID_TIPOS: ReadonlyArray<PunchTipo> = [
@@ -107,6 +108,55 @@ export async function registrarPunch(
     };
   }
 
+  // ── 3.1) Upload da Foto (se enviada) ─────────────────────────
+  let photoUrl: string | null = null;
+  if (input.photoBase64) {
+    try {
+      // Extrair apenas os dados do base64 ignorando o header (data:image/jpeg;base64,...)
+      const matches = input.photoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const base64Data = (matches ? matches[2] : input.photoBase64) ?? input.photoBase64;
+      const buffer = Buffer.from(base64Data, "base64");
+      
+      const BUCKET_NAME = "ponto-fotos";
+      const { data: buckets } = await service.storage.listBuckets();
+      
+      if (buckets && !buckets.find((b) => b.name === BUCKET_NAME)) {
+        await service.storage.createBucket(BUCKET_NAME, { public: true });
+      }
+
+      const fileName = `${employee.id}/${Date.now()}.jpg`;
+      const { error: uploadErr } = await service.storage
+        .from(BUCKET_NAME)
+        .upload(fileName, buffer, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+
+      if (!uploadErr) {
+        const { data: publicUrlData } = service.storage
+          .from(BUCKET_NAME)
+          .getPublicUrl(fileName);
+        photoUrl = publicUrlData.publicUrl;
+      }
+    } catch (err) {
+      console.error("[registrarPunch] Falha no upload da foto", err);
+    }
+  }
+
+  // Combinar photoUrl dentro do deviceInfo JSON
+  let deviceInfoObj: Record<string, any> = {};
+  if (input.deviceInfo) {
+    try {
+      deviceInfoObj = JSON.parse(input.deviceInfo);
+    } catch { /* ignore parse err */ }
+  }
+  if (photoUrl) {
+    deviceInfoObj.photoUrl = photoUrl;
+  }
+  const finalDeviceInfo = Object.keys(deviceInfoObj).length > 0 
+    ? JSON.stringify(deviceInfoObj) 
+    : null;
+
   const { data, error } = await service
     .from("time_clock_punches")
     .insert({
@@ -114,7 +164,7 @@ export async function registrarPunch(
       tipo: input.tipo,
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
-      device_info: input.deviceInfo ?? null,
+      device_info: finalDeviceInfo,
       timestamp_punch: new Date().toISOString(),
     } as never)
     .select()
