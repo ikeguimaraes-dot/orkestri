@@ -1,55 +1,11 @@
-// Loaders + types pro painel WBR (Weekly Business Review).
-//
-// Note: views financeiras (v_dre_consolidado) são por competência mensal.
-// Pra "semana atual" combinamos:
-//   - Receita semanal: cash_flow_entries.valor por brand_id no range da semana
-//   - CMV%, prime cost, ebitda%: snapshot mensal (mês da semana)
-//   - Headcount: snapshot atual
-//   - Eventos: events.data_inicio dentro da semana
-//   - Alertas: v_alertas filtrados por brand
-//   - Metas: brand_financial_config
+// Loaders server-side pro painel WBR (Weekly Business Review).
+// Tipos e funções puras ficam em wbr-shared.ts (importável por Client Components).
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { WbrBrandKpi, WbrPayload } from "./wbr-shared";
 
-export type WbrBrandKpi = {
-  brand_id: string;
-  brand_name: string;
-  brand_slug: string;
-  brand_color: string | null;
-  // Financeiro (semana — extraído de cash_flow_entries)
-  receita_realizada: number;
-  receita_projetada: number;
-  receita_gap_abs: number;
-  receita_gap_pct: number | null;
-  // Snapshot mensal (mês corrente da semana selecionada)
-  cmv_pct: number | null;
-  cmv_meta: number | null;
-  prime_cost_pct: number | null;
-  prime_cost_meta: number | null;
-  ebitda_pct: number | null;
-  // Pessoas
-  headcount_ativo: number;
-  // Eventos da semana
-  eventos_total: number;
-  eventos_concluidos: number;
-  eventos_em_andamento: number;
-  eventos_pendentes: number;
-  // Alertas
-  alertas_total: number;
-  alertas_criticos: number;
-};
-
-export type WbrPayload = {
-  weekStart: string;          // ISO (YYYY-MM-DD), segunda-feira
-  weekEnd: string;            // ISO (YYYY-MM-DD), domingo
-  monthCompetencia: string;   // ISO YYYY-MM-01
-  brands: WbrBrandKpi[];
-  // Totais agregados pro topo
-  total_receita: number;
-  total_eventos: number;
-  total_headcount: number;
-  total_alertas_criticos: number;
-};
+export type { WbrBrandKpi, WbrPayload } from "./wbr-shared";
+export { cmvSeverity, primeSeverity, receitaSeverity, type Severity } from "./wbr-shared";
 
 /** ISO week start (Monday) e end (Sunday) a partir de uma data qualquer. */
 export function weekRange(refIso: string): { start: string; end: string } {
@@ -282,28 +238,3 @@ export async function loadWbr(refDateIso: string): Promise<WbrPayload | null> {
   };
 }
 
-export type Severity = "ok" | "warn" | "danger";
-
-/** CMV%: ok < meta · warn ≤ meta+5 · danger acima. */
-export function cmvSeverity(pct: number | null, meta: number | null): Severity {
-  if (pct == null || meta == null) return "ok";
-  if (pct <= meta) return "ok";
-  if (pct <= meta + 5) return "warn";
-  return "danger";
-}
-
-/** Prime cost: mesma lógica. */
-export function primeSeverity(pct: number | null, meta: number | null): Severity {
-  if (pct == null || meta == null) return "ok";
-  if (pct <= meta) return "ok";
-  if (pct <= meta + 5) return "warn";
-  return "danger";
-}
-
-/** Receita gap: ok ≥ 0, warn entre -10% e 0, danger < -10%. */
-export function receitaSeverity(gapPct: number | null): Severity {
-  if (gapPct == null) return "ok";
-  if (gapPct >= 0) return "ok";
-  if (gapPct >= -10) return "warn";
-  return "danger";
-}

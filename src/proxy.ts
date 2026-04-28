@@ -26,22 +26,37 @@ export async function proxy(request: NextRequest) {
     // /login (page sem handler POST), retornando 405. Acontece em mobile
     // PWA quando o cookie de sessão expira silenciosamente.
     if (path.startsWith("/api/")) {
-      return NextResponse.json(
+      const apiResponse = NextResponse.json(
         { ok: false, error: "Não autenticado" },
         { status: 401 },
       );
+      // Propaga cookies de sessão atualizados (ex: limpeza de tokens)
+      response.cookies.getAll().forEach((cookie) => {
+        apiResponse.cookies.set(cookie.name, cookie.value, cookie);
+      });
+      return apiResponse;
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Propaga cookies de sessão atualizados (ex: limpeza de tokens)
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
   }
 
   if (user && path === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Propaga cookies de sessão atualizados (ex: refresh de tokens)
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
   }
 
   return response;

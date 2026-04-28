@@ -20,7 +20,7 @@ const TIMEREC_TABLE = "time_records" as const;
 const OT_TABLE = "overtime_records" as const;
 const EMPLOYEES_TABLE = "employees" as const;
 
-export const BULK_APPROVE_MAX = 50;
+const BULK_APPROVE_MAX = 50;
 
 /**
  * Aprova até `BULK_APPROVE_MAX` pontos de uma vez por array de IDs.

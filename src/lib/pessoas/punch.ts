@@ -4,6 +4,8 @@
 // IMPORTANTE: NÃO mora em actions.ts porque arquivos "use server" fazem
 // todos os exports virarem Server Actions (RPC), inclusive funções puras.
 
+export const BULK_APPROVE_MAX = 50;
+
 import type {
   EmployeeStub,
   PunchDaySummary,

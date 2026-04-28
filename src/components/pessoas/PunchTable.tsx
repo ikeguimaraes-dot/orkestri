@@ -30,10 +30,8 @@ import {
   approvePunch,
   rejectPunch,
 } from "@/lib/pessoas/actions";
-import {
-  approvePunchesBulk,
-  BULK_APPROVE_MAX,
-} from "@/app/(dashboard)/pessoas/ponto/actions";
+import { approvePunchesBulk } from "@/app/(dashboard)/pessoas/ponto/actions";
+import { BULK_APPROVE_MAX } from "@/lib/pessoas/punch";
 import {
   PUNCH_COLOR,
   PUNCH_LABEL,

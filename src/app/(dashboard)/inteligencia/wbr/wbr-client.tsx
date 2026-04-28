@@ -21,7 +21,7 @@ import {
   type Severity,
   type WbrBrandKpi,
   type WbrPayload,
-} from "@/lib/inteligencia/wbr";
+} from "@/lib/inteligencia/wbr-shared";
 
 const SEV_BG: Record<Severity, string> = {
   ok: "rgba(34,197,94,0.16)",
