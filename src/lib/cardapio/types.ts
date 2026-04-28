@@ -58,6 +58,39 @@ export const CARDAPIO_CATEGORIAS_SUGERIDAS = [
   "Outro",
 ] as const;
 
+// ── Ficha técnica de cardápio (migration 025) ─────────────────
+
+export type RecipeItem = {
+  id: string;
+  cmv_item_id: string;
+  unit_id: string | null;
+  insumo: string;
+  unidade: string | null;
+  quantidade: number;
+  custo_unitario: number;
+  custo_total: number; // GENERATED ALWAYS AS (quantidade * custo_unitario)
+  created_at: string;
+};
+
+export type RecipeItemInsert = {
+  cmv_item_id: string;
+  unit_id?: string | null;
+  insumo: string;
+  unidade?: string | null;
+  quantidade: number;
+  custo_unitario: number;
+};
+
+export type RecipeItemUpdate = Partial<Omit<RecipeItemInsert, "cmv_item_id">>;
+
+export type RecipeNote = {
+  id: string;
+  cmv_item_id: string;
+  nota: string;
+  created_by: string | null;
+  created_at: string;
+};
+
 // Faixas de CMV pra UI de semáforo.
 export type CmvSeverity = "ok" | "atencao" | "critico" | "indefinido";
 

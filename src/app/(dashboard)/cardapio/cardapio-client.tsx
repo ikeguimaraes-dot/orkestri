@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
+  ChefHat,
   FileWarning,
   MoreHorizontal,
   Pencil,
@@ -502,7 +503,14 @@ export function CardapioClient({
                         <TableCell style={{ textAlign: "center" }}>
                           <CmvBadge pct={it.cmv_pct} />
                         </TableCell>
-                        <TableCell style={{ textAlign: "center" }}>
+                        <TableCell
+                          style={{ textAlign: "center" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/cardapio/${it.id}`);
+                          }}
+                          title="Ver ficha técnica"
+                        >
                           {it.tem_ficha_tecnica ? (
                             <Check
                               size={16}
@@ -557,6 +565,12 @@ export function CardapioClient({
                               <MoreHorizontal className="h-4 w-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/cardapio/${it.id}`)}
+                              >
+                                <ChefHat className="mr-2 h-4 w-4" />
+                                Ficha técnica
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() =>
                                   router.push(`/cardapio/${it.id}/editar`)

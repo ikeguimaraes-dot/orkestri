@@ -18,6 +18,10 @@ import {
 import type {
   CmvItem,
   CmvItemWithBrand,
+  RecipeItem,
+  RecipeItemInsert,
+  RecipeItemUpdate,
+  RecipeNote,
 } from "@/lib/cardapio/types";
 
 const TABLE = "cmv_items" as const;
@@ -197,6 +201,130 @@ export async function deleteCmvItem(
 
     revalidatePath("/cardapio");
     return { ok: true, data: { id } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+// ── Ficha técnica (recipe_items / recipe_notes) ───────────────
+
+export async function listRecipeItems(cmvItemId: string): Promise<RecipeItem[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("recipe_items")
+      .select("*")
+      .eq("cmv_item_id", cmvItemId)
+      .order("created_at");
+    if (error) { console.error("[listRecipeItems]", error.message); return []; }
+    return (data ?? []) as RecipeItem[];
+  } catch (e) {
+    console.error("[listRecipeItems] exceção:", e);
+    return [];
+  }
+}
+
+export async function upsertRecipeItem(
+  payload: RecipeItemInsert & { id?: string },
+): Promise<ActionResult<RecipeItem>> {
+  try {
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    if (!payload.insumo?.trim()) return { ok: false, error: "Insumo obrigatório" };
+
+    const { id, ...rest } = payload;
+    let q;
+    if (id) {
+      const patch: RecipeItemUpdate = {
+        insumo: rest.insumo,
+        unidade: rest.unidade ?? null,
+        quantidade: rest.quantidade,
+        custo_unitario: rest.custo_unitario,
+      };
+      q = supabase
+        .from("recipe_items")
+        .update(patch as never)
+        .eq("id", id)
+        .select()
+        .single();
+    } else {
+      q = supabase
+        .from("recipe_items")
+        .insert(rest as never)
+        .select()
+        .single();
+    }
+
+    const { data, error } = await q;
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+
+    revalidatePath(`/cardapio/${payload.cmv_item_id}`);
+    revalidatePath("/cardapio");
+    return { ok: true, data: data as RecipeItem };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function deleteRecipeItem(
+  id: string,
+  cmvItemId: string,
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const { error } = await supabase.from("recipe_items").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath(`/cardapio/${cmvItemId}`);
+    revalidatePath("/cardapio");
+    return { ok: true, data: { id } };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
+
+export async function listRecipeNotes(cmvItemId: string): Promise<RecipeNote[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("recipe_notes")
+      .select("*")
+      .eq("cmv_item_id", cmvItemId)
+      .order("created_at", { ascending: false });
+    if (error) { console.error("[listRecipeNotes]", error.message); return []; }
+    return (data ?? []) as RecipeNote[];
+  } catch (e) {
+    console.error("[listRecipeNotes] exceção:", e);
+    return [];
+  }
+}
+
+export async function createRecipeNote(
+  cmvItemId: string,
+  nota: string,
+): Promise<ActionResult<RecipeNote>> {
+  try {
+    if (!nota?.trim()) return { ok: false, error: "Nota não pode estar vazia" };
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const { data, error } = await supabase
+      .from("recipe_notes")
+      .insert({ cmv_item_id: cmvItemId, nota: nota.trim(), created_by: user.id } as never)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
+
+    revalidatePath(`/cardapio/${cmvItemId}`);
+    return { ok: true, data: data as RecipeNote };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
   }
