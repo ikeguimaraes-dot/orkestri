@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Clock,
   CreditCard,
+  GraduationCap,
   IdCard,
   Pencil,
   Plane,
@@ -23,12 +24,14 @@ import {
   listTransportVouchers,
   listVacations,
 } from "@/lib/pessoas/actions";
+import { listRecordsForEmployee } from "@/app/(dashboard)/pessoas/treinamentos/actions";
 import { requireUser } from "@/lib/auth/server";
 import { avatarColor, initials } from "@/lib/format";
 import { GorjetasTab } from "@/components/pessoas/profile-tabs/GorjetasTab";
 import { VtTab } from "@/components/pessoas/profile-tabs/VtTab";
 import { HorasExtrasTab } from "@/components/pessoas/profile-tabs/HorasExtrasTab";
 import { FeriasTab } from "@/components/pessoas/profile-tabs/FeriasTab";
+import { TreinamentosTab } from "@/components/pessoas/profile-tabs/TreinamentosTab";
 
 const TIPO_CONTRATO_LABEL: Record<string, string> = {
   CLT: "CLT",
@@ -162,12 +165,13 @@ export default async function ColaboradorPerfilPage({ params }: Props) {
   const employee = await getEmployee(id);
   if (!employee) notFound();
 
-  const [tips, vts, hes, vacations, dependents] = await Promise.all([
+  const [tips, vts, hes, vacations, dependents, trainings] = await Promise.all([
     listTipsRecords(id),
     listTransportVouchers(id),
     listOvertimeRecords(id),
     listVacations(id, "employee"),
     listDependents(id),
+    listRecordsForEmployee(id),
   ]);
 
   const fullName = `${employee.nome} ${employee.sobrenome}`.trim();
@@ -335,6 +339,10 @@ export default async function ColaboradorPerfilPage({ params }: Props) {
             <Plane className="mr-1.5 h-3.5 w-3.5" />
             Férias ({vacations.length})
           </TabsTrigger>
+          <TabsTrigger value="treinamentos">
+            <GraduationCap className="mr-1.5 h-3.5 w-3.5" />
+            Treinamentos ({trainings.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dados-pessoais">
@@ -468,6 +476,9 @@ export default async function ColaboradorPerfilPage({ params }: Props) {
             records={vacations}
             currentUserId={user.id}
           />
+        </TabsContent>
+        <TabsContent value="treinamentos">
+          <TreinamentosTab records={trainings} />
         </TabsContent>
       </Tabs>
     </div>

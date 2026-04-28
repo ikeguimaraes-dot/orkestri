@@ -2148,6 +2148,93 @@ export type Database = {
           created_at?: string;
         };
       };
+      // ── Treinamentos / Onboarding (migration 021) ─────────────
+      training_templates: {
+        Row: {
+          id: string;
+          brand_id: string;
+          unit_id: string | null;
+          nome: string;
+          descricao: string | null;
+          funcao: string | null;
+          obrigatorio: boolean;
+          validade_dias: number | null;
+          ativo: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          brand_id: string;
+          unit_id?: string | null;
+          nome: string;
+          descricao?: string | null;
+          funcao?: string | null;
+          obrigatorio?: boolean;
+          validade_dias?: number | null;
+          ativo?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          brand_id?: string;
+          unit_id?: string | null;
+          nome?: string;
+          descricao?: string | null;
+          funcao?: string | null;
+          obrigatorio?: boolean;
+          validade_dias?: number | null;
+          ativo?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      training_records: {
+        Row: {
+          id: string;
+          employee_id: string;
+          template_id: string;
+          status: TrainingStatus;
+          data_inicio: string | null;
+          data_conclusao: string | null;
+          validade_dias_snapshot: number | null;
+          validade_ate: string | null;
+          observacoes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          template_id: string;
+          status?: TrainingStatus;
+          data_inicio?: string | null;
+          data_conclusao?: string | null;
+          validade_dias_snapshot?: number | null;
+          observacoes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: string;
+          template_id?: string;
+          status?: TrainingStatus;
+          data_inicio?: string | null;
+          data_conclusao?: string | null;
+          validade_dias_snapshot?: number | null;
+          observacoes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       // ── Fase E3 / Dashboard ──────────────────────────────────
@@ -2413,3 +2500,13 @@ export type ClientInteractionTipo =
 
 export type ClientRow = Tables<"clients">;
 export type ClientInteractionRow = Tables<"client_interactions">;
+
+// ── Treinamentos / Onboarding (migration 021) ─────────────────
+export type TrainingStatus =
+  | "pendente"
+  | "em_andamento"
+  | "concluido"
+  | "vencido";
+
+export type TrainingTemplateRow = Tables<"training_templates">;
+export type TrainingRecordRow = Tables<"training_records">;

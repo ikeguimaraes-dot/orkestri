@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Wallet, Users, BookOpen, ShoppingCart,
   MessageSquare, BarChart3, Megaphone, CalendarDays,
   Plane, Briefcase, Building2, Upload, LineChart,
-  TrendingUp, Brain, Handshake,
+  TrendingUp, Brain, Handshake, GraduationCap,
   ChevronDown, ChevronRight, Check, LogOut,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -51,9 +51,10 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Users,
     defaultOpen: true,
     items: [
-      { href: "/pessoas/colaboradores", label: "Pessoas",    icon: Users },
-      { href: "/pessoas/ferias",        label: "Férias",     icon: Plane },
-      { href: "/pessoas/importacao",    label: "Importação", icon: Upload },
+      { href: "/pessoas/colaboradores", label: "Pessoas",      icon: Users },
+      { href: "/pessoas/ferias",        label: "Férias",       icon: Plane },
+      { href: "/pessoas/treinamentos",  label: "Treinamentos", icon: GraduationCap },
+      { href: "/pessoas/importacao",    label: "Importação",   icon: Upload },
     ],
   },
   {
