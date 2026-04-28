@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { PunchTable } from "@/components/pessoas/PunchTable";
+import { PontoToggle } from "@/components/pessoas/PontoToggle";
 import { listPunchesByDay } from "@/lib/pessoas/actions";
 import { summarizePunchesByEmployee } from "@/lib/pessoas/punch";
 import { requireUser } from "@/lib/auth/server";
@@ -47,13 +48,14 @@ export default async function PontoPage({
             style={{
               fontSize: 26,
               fontWeight: 700,
-              margin: "6px 0 0",
+              margin: "6px 0 12px",
               color: "var(--text)",
               letterSpacing: -0.4,
             }}
           >
-            Aprovação de ponto
+            Ponto
           </h1>
+          <PontoToggle active="aprovacao" />
         </div>
         <DateFilter currentIso={dataIso} />
       </header>

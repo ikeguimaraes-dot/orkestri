@@ -31,6 +31,10 @@ import {
   rejectPunch,
 } from "@/lib/pessoas/actions";
 import {
+  approvePunchesBulk,
+  BULK_APPROVE_MAX,
+} from "@/app/(dashboard)/pessoas/ponto/actions";
+import {
   PUNCH_COLOR,
   PUNCH_LABEL,
   formatHHMM,
@@ -63,6 +67,7 @@ export function PunchTable({
   const [, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedEmpIds, setSelectedEmpIds] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     if (statusFilter === "todos") return summaries;
@@ -116,6 +121,48 @@ export function PunchTable({
     });
   };
 
+  // IDs de punches pendentes nos employees selecionados, capados em BULK_APPROVE_MAX
+  const selectedPendingIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const s of summaries) {
+      if (!selectedEmpIds.has(s.employee.id)) continue;
+      for (const p of s.punches) {
+        if (p.aprovado === null) ids.push(p.id);
+      }
+    }
+    return ids;
+  }, [summaries, selectedEmpIds]);
+
+  const willApprove = Math.min(selectedPendingIds.length, BULK_APPROVE_MAX);
+  const willSkip = selectedPendingIds.length - willApprove;
+
+  function toggleSelection(empId: string) {
+    setSelectedEmpIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(empId)) next.delete(empId);
+      else next.add(empId);
+      return next;
+    });
+  }
+
+  const onApproveSelected = () => {
+    if (selectedPendingIds.length === 0) return;
+    const msg =
+      willSkip > 0
+        ? `Aprovar ${willApprove} pendente(s)? (${willSkip} ficarão de fora — limite de ${BULK_APPROVE_MAX} por vez)`
+        : `Aprovar ${willApprove} ponto(s) pendente(s)?`;
+    if (!window.confirm(msg)) return;
+    startTransition(async () => {
+      const res = await approvePunchesBulk(selectedPendingIds);
+      if (!res.ok) {
+        alert(`Falha: ${res.error}`);
+        return;
+      }
+      setSelectedEmpIds(new Set());
+      router.refresh();
+    });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div
@@ -147,10 +194,28 @@ export function PunchTable({
             ponto{totalPunches === 1 ? "" : "s"}
           </span>
         </div>
-        <Button onClick={onApproveAll} disabled={totalPending === 0}>
-          <CheckCheck className="mr-2 h-4 w-4" />
-          Aprovar todos pendentes ({totalPending})
-        </Button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {selectedEmpIds.size > 0 && (
+            <Button
+              onClick={onApproveSelected}
+              disabled={selectedPendingIds.length === 0}
+              variant="outline"
+              title={
+                willSkip > 0
+                  ? `${selectedPendingIds.length} pendentes — aprovar ${willApprove} (limite ${BULK_APPROVE_MAX})`
+                  : `Aprovar ${willApprove} pendentes selecionados`
+              }
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Aprovar selecionados ({willApprove}
+              {willSkip > 0 ? `/${selectedPendingIds.length}` : ""})
+            </Button>
+          )}
+          <Button onClick={onApproveAll} disabled={totalPending === 0}>
+            <CheckCheck className="mr-2 h-4 w-4" />
+            Aprovar todos pendentes ({totalPending})
+          </Button>
+        </div>
       </div>
 
       <div
@@ -178,6 +243,8 @@ export function PunchTable({
               key={s.employee.id}
               summary={s}
               expanded={expandedId === s.employee.id}
+              selected={selectedEmpIds.has(s.employee.id)}
+              onSelect={() => toggleSelection(s.employee.id)}
               onToggle={() =>
                 setExpandedId(expandedId === s.employee.id ? null : s.employee.id)
               }
@@ -194,51 +261,78 @@ export function PunchTable({
 function EmployeeRow({
   summary,
   expanded,
+  selected,
+  onSelect,
   onToggle,
   onApprove,
   onReject,
 }: {
   summary: PunchDaySummary;
   expanded: boolean;
+  selected: boolean;
+  onSelect: () => void;
   onToggle: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
   const fullName = `${summary.employee.nome} ${summary.employee.sobrenome}`.trim();
   const color = avatarColor(fullName);
+  const hasPending = summary.pending_count > 0;
   return (
-    <div style={{ borderBottom: "1px solid var(--border)" }}>
-      <button
-        onClick={onToggle}
-        style={{
-          width: "100%",
-          padding: "14px 16px",
-          background: "transparent",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          cursor: "pointer",
-          textAlign: "left",
-        }}
-      >
-        <div
+    <div
+      style={{
+        borderBottom: "1px solid var(--border)",
+        background: selected ? "color-mix(in srgb, var(--brand) 6%, transparent)" : "transparent",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", padding: "14px 16px", gap: 12 }}>
+        <input
+          type="checkbox"
+          checked={selected}
+          disabled={!hasPending}
+          onChange={onSelect}
+          aria-label={hasPending ? `Selecionar ${fullName}` : `${fullName} sem pendentes`}
+          title={hasPending ? "Selecionar pra bulk approve" : "Sem pendentes"}
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 99,
-            background: `color-mix(in srgb, ${color} 18%, transparent)`,
-            color,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            fontWeight: 700,
+            width: 16,
+            height: 16,
+            accentColor: "var(--brand)",
+            cursor: hasPending ? "pointer" : "not-allowed",
+            opacity: hasPending ? 1 : 0.3,
             flexShrink: 0,
           }}
+        />
+        <button
+          onClick={onToggle}
+          style={{
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            cursor: "pointer",
+            textAlign: "left",
+            padding: 0,
+          }}
         >
-          {initials(fullName)}
-        </div>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 99,
+              background: `color-mix(in srgb, ${color} 18%, transparent)`,
+              color,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 700,
+              flexShrink: 0,
+            }}
+          >
+            {initials(fullName)}
+          </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
             {fullName}
@@ -302,7 +396,8 @@ function EmployeeRow({
         >
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
-      </button>
+        </button>
+      </div>
       {expanded && (
         <div
           style={{
