@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Wallet, Users, BookOpen, ShoppingCart,
-  MessageSquare, Brain, Megaphone, CalendarDays,
-  Plane, Briefcase, Building2, Upload,
+  MessageSquare, BarChart3, Megaphone, CalendarDays,
+  Plane, Briefcase, Building2, Upload, LineChart,
   ChevronDown, Check, LogOut,
 } from "lucide-react";
 import { useAuth, useUnit } from "@/lib/auth/context";
@@ -21,7 +21,8 @@ const NAV = [
   { href: "/cardapio",      label: "Cardápio",      icon: BookOpen },
   { href: "/compras",       label: "Compras",       icon: ShoppingCart },
   { href: "/cliente",       label: "Cliente",       icon: MessageSquare },
-  { href: "/inteligencia",  label: "Inteligência",  icon: Brain },
+  { href: "/inteligencia",  label: "Inteligência",  icon: BarChart3 },
+  { href: "/inteligencia/wbr", label: "WBR",         icon: LineChart },
   { href: "/marcas",        label: "Marcas",        icon: Building2 },
   { href: "/eventos",       label: "Eventos",       icon: CalendarDays },
   { href: "/campanhas",     label: "Campanhas",     icon: Megaphone },
