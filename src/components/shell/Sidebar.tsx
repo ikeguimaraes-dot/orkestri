@@ -134,7 +134,7 @@ export function Sidebar() {
       <aside
         className={`shell-sidebar ${mobileOpen ? "open" : ""}`}
         style={{
-          width: 240,
+          width: 240, flexShrink: 0,
           background: "var(--sidebar)", borderRight: "1px solid var(--sidebar-border)",
           display: "flex", flexDirection: "column",
         }}

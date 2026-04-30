@@ -19,9 +19,16 @@ export default async function DashboardLayout({
 
   return (
     <AuthProvider user={user} units={units}>
-      <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+      <div
+        style={{
+          display: "flex",
+          height: "100vh",
+          background: "var(--bg)",
+          color: "var(--text)",
+        }}
+      >
         <Sidebar />
-        <div className="shell-content" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <TopBar />
           <main className="shell-main" style={{ flex: 1, overflowY: "auto", padding: "32px 28px" }}>{children}</main>
         </div>
