@@ -5,6 +5,8 @@ import type { Database } from "@/types/database";
 export const runtime = "nodejs";
 
 export async function middleware(request: NextRequest) {
+  console.log('[middleware] path:', request.nextUrl.pathname)
+  console.log('[middleware] cookies:', request.cookies.getAll().map(c => c.name))
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,6 +39,7 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  console.log('[middleware] user:', user?.email ?? 'NULL')
 
   const pathname = request.nextUrl.pathname;
 
