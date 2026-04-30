@@ -7,6 +7,13 @@ import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -138,12 +145,35 @@ export function VtTab({
               gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             }}
           >
-            <Field label="Período (mês)">
-              <Input
-                type="month"
-                value={periodo.slice(0, 7)}
-                onChange={(e) => setPeriodo(e.target.value)}
-              />
+            <Field label="Mês">
+              <Select
+                value={periodo.slice(5, 7)}
+                onValueChange={(m) =>
+                  setPeriodo(`${periodo.slice(0, 4) || new Date().getFullYear().toString()}-${m}`)
+                }
+              >
+                <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+                <SelectContent>
+                  {["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((nome, i) => (
+                    <SelectItem key={i} value={String(i + 1).padStart(2, "0")}>{nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Ano">
+              <Select
+                value={periodo.slice(0, 4)}
+                onValueChange={(a) =>
+                  setPeriodo(`${a}-${periodo.slice(5, 7) || "01"}`)
+                }
+              >
+                <SelectTrigger><SelectValue placeholder="Ano" /></SelectTrigger>
+                <SelectContent>
+                  {["2024","2025","2026","2027"].map((a) => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Dias úteis">
               <Input

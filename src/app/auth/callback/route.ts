@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     if (service) {
       await service
         .from('employees')
-        .update({ user_id: data.session.user.id })
+        .update({ user_id: data.session.user.id } as never)
         .eq('id', employeeId)
         .is('user_id', null) // só vincula se ainda não tem user
     }
