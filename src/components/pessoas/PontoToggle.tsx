@@ -34,6 +34,7 @@ export function PontoToggle({ active }: { active: View }) {
 
   return (
     <div
+      className="ponto-toggle"
       style={{
         display: "inline-flex",
         gap: 4,
@@ -41,6 +42,9 @@ export function PontoToggle({ active }: { active: View }) {
         background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: 10,
+        overflowX: "auto",
+        maxWidth: "100%",
+        scrollbarWidth: "none", // hide scrollbar Firefox
       }}
     >
       {pill("aprovacao", "Aprovação de punches", "/pessoas/ponto")}

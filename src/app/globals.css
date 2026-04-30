@@ -145,3 +145,100 @@
     @apply font-sans;
   }
 }
+
+/* ── KPH Shell Responsivo ── */
+.shell-sidebar {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  transition: transform var(--t);
+}
+
+.shell-content {
+  transition: margin-left var(--t);
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t);
+}
+
+@media (max-width: 767px) {
+  .shell-sidebar {
+    transform: translateX(-100%);
+  }
+  .shell-sidebar.open {
+    transform: translateX(0);
+  }
+  .shell-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .shell-hamburger {
+    display: flex !important;
+  }
+  .shell-topbar {
+    padding: 0 16px !important;
+    gap: 12px !important;
+  }
+  .shell-topbar-title {
+    font-size: 13px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shell-topbar-date {
+    display: none !important;
+  }
+  .shell-topbar-search span {
+    display: none !important;
+  }
+  .shell-main {
+    padding: 24px 16px !important;
+  }
+  .shell-content {
+    margin-left: 0 !important;
+  }
+
+  /* ── Ponto Mobile ── */
+  .ponto-toggle {
+    width: 100%;
+  }
+  .ponto-toggle a {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+  .ponto-bulk-actions {
+    width: 100%;
+  }
+  .ponto-bulk-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .ponto-date-filter {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .shell-sidebar {
+    transform: translateX(0) !important;
+  }
+  .shell-content {
+    margin-left: 240px !important;
+  }
+  .shell-backdrop {
+    display: none !important;
+  }
+  .shell-hamburger {
+    display: none !important;
+  }
+}

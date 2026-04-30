@@ -118,6 +118,7 @@ async function PontoSection({ dataIso }: { dataIso: string }) {
 function DateFilter({ currentIso }: { currentIso: string }) {
   return (
     <form
+      className="ponto-date-filter"
       method="get"
       style={{
         display: "flex",
@@ -145,6 +146,7 @@ function DateFilter({ currentIso }: { currentIso: string }) {
         name="data"
         defaultValue={currentIso}
         style={{
+          flex: 1,
           height: 28,
           padding: "0 8px",
           background: "var(--background)",

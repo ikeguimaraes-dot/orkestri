@@ -95,6 +95,7 @@ export function Sidebar() {
   const { unit, units, setUnit } = useUnit();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -103,6 +104,17 @@ export function Sidebar() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  useEffect(() => {
+    const onToggle = () => setMobileOpen((v) => !v);
+    window.addEventListener("kph:toggleSidebar", onToggle);
+    return () => window.removeEventListener("kph:toggleSidebar", onToggle);
+  }, []);
+
+  // Fecha sidebar ao navegar no mobile
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const initials =
     user?.email?.slice(0, 2).toUpperCase() ?? "?";
@@ -114,13 +126,19 @@ export function Sidebar() {
   const role = user?.roles[0]?.role ?? "—";
 
   return (
-    <aside
-      style={{
-        width: 240, flexShrink: 0,
-        background: "var(--sidebar)", borderRight: "1px solid var(--sidebar-border)",
-        display: "flex", flexDirection: "column",
-      }}
-    >
+    <>
+      <div 
+        className={`shell-backdrop ${mobileOpen ? "open" : ""}`}
+        onClick={() => setMobileOpen(false)}
+      />
+      <aside
+        className={`shell-sidebar ${mobileOpen ? "open" : ""}`}
+        style={{
+          width: 240,
+          background: "var(--sidebar)", borderRight: "1px solid var(--sidebar-border)",
+          display: "flex", flexDirection: "column",
+        }}
+      >
       <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid var(--sidebar-border)" }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>
           KPH <span style={{ color: "var(--brand)" }}>OS</span>
@@ -263,6 +281,7 @@ export function Sidebar() {
         </Link>
       </div>
     </aside>
+    </>
   );
 }
 

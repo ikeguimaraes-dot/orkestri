@@ -192,9 +192,10 @@ export function PunchTable({
             ponto{totalPunches === 1 ? "" : "s"}
           </span>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="ponto-bulk-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {selectedEmpIds.size > 0 && (
             <Button
+              className="ponto-bulk-btn"
               onClick={onApproveSelected}
               disabled={selectedPendingIds.length === 0}
               variant="outline"
@@ -209,7 +210,7 @@ export function PunchTable({
               {willSkip > 0 ? `/${selectedPendingIds.length}` : ""})
             </Button>
           )}
-          <Button onClick={onApproveAll} disabled={totalPending === 0}>
+          <Button className="ponto-bulk-btn" onClick={onApproveAll} disabled={totalPending === 0}>
             <CheckCheck className="mr-2 h-4 w-4" />
             Aprovar todos pendentes ({totalPending})
           </Button>
@@ -347,6 +348,8 @@ function EmployeeRow({
                   background: "rgba(245,158,11,0.16)",
                   color: "#A16207",
                   fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  display: "inline-block",
                 }}
               >
                 {summary.pending_count} pendente{summary.pending_count === 1 ? "" : "s"}
