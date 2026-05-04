@@ -2,7 +2,7 @@ import { getRunDetails, submitHumanDecision } from '@/lib/orquestrador/actions'
 import { redirect } from 'next/navigation'
 
 export default async function RunDetailPage({ params }: { params: { id: string } }) {
-  const run = await getRunDetails(params.id)
+  const run = await getRunDetails(params.id) as any
   const runId = params.id
 
   async function approve(formData: FormData) {
