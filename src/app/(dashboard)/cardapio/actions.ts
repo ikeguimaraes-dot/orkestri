@@ -97,7 +97,7 @@ export async function createMenuItem(
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Inválido" };
     }
-    const user = await requireUser();
+    await requireUser();
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { ok: false, error: "Supabase indisponível" };
 
@@ -111,7 +111,6 @@ export async function createMenuItem(
       tem_ficha_tecnica: parsed.data.tem_ficha_tecnica ?? false,
       ativo: parsed.data.ativo ?? true,
       observacoes: parsed.data.observacoes ?? null,
-      criado_por: user.id,
     };
 
     const { data, error } = await supabase

@@ -175,7 +175,9 @@ export function CardapioFormClient({ mode, brands, initial }: Props) {
           <Field label="Marca" required>
             <Select value={brandId} onValueChange={(v) => v && setBrandId(v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione marca" />
+                <SelectValue>
+                  {brands.find((b) => b.id === brandId)?.name ?? "Selecione marca"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {brands.map((b) => (
