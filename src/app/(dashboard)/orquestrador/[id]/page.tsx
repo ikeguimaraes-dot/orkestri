@@ -1,4 +1,4 @@
-import { getRunDetails, submitHumanDecision } from '@/lib/orquestrador/actions'
+import { getRunDetails, submitRunDecision } from '@/lib/orquestrador/actions'
 import { redirect } from 'next/navigation'
 
 export default async function RunDetailPage({ params }: { params: { id: string } }) {
@@ -9,7 +9,7 @@ export default async function RunDetailPage({ params }: { params: { id: string }
     'use server'
     const feedback = formData.get('feedback') as string
     const id = formData.get('run_id') as string
-    await submitHumanDecision(id, 'approve', feedback)
+    await submitRunDecision(id, 'approve', feedback)
     redirect('/orquestrador')
   }
 
@@ -17,19 +17,20 @@ export default async function RunDetailPage({ params }: { params: { id: string }
     'use server'
     const feedback = formData.get('feedback') as string
     const id = formData.get('run_id') as string
-    await submitHumanDecision(id, 'reject', feedback)
+    await submitRunDecision(id, 'reject', feedback)
     redirect('/orquestrador')
   }
 
+  if (!run) redirect('/orquestrador')
   const logs = (run.logs ?? []) as Array<{ ts: string; msg: string }>
-  const approvals = (run.hos_approvals ?? []) as Array<{ decision: string; feedback?: string; created_at: string }>
+  const approvals = ((run as unknown as Record<string, unknown>).hos_approvals ?? []) as Array<{ decision: string; feedback?: string; created_at: string }>
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{(run.hos_jobs as any)?.name}</h1>
+        <h1 className="text-2xl font-bold">{(run.job as any)?.name}</h1>
         <p className="text-sm text-gray-400 mt-1">
-          {new Date(run.created_at).toLocaleString('pt-BR')} · via {run.triggered_by} · status: <strong>{run.status}</strong>
+          {new Date(run.created_at).toLocaleString('pt-BR')} · via {(run as any).triggered_by ?? '—'} · status: <strong>{run.status}</strong>
         </p>
       </div>
 

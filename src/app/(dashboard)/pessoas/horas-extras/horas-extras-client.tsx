@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Clock, DollarSign, Loader2, Plus, Search, Timer, X } from "lucide-react";
+import { Check, Clock, DollarSign, Loader2, Plus, Search, Timer, TrendingUp, TrendingDown, X } from "lucide-react";
+import { getBancoHorasUnit, type BancoHorasEntry } from "@/lib/pessoas/actions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,12 +83,24 @@ export function HorasExtrasClient({
   defaultAno: number;
 }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"he" | "banco">("he");
+  const [bancoData, setBancoData] = useState<BancoHorasEntry[] | null>(null);
   const [records, setRecords] = useState(initialRecords);
   const [pending, startTransition] = useTransition();
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  function handleTabChange(tab: "he" | "banco") {
+    setActiveTab(tab);
+    if (tab === "banco" && bancoData === null) {
+      startTransition(async () => {
+        const data = await getBancoHorasUnit(unitId);
+        setBancoData(data);
+      });
+    }
+  }
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const [formEmployee, setFormEmployee] = useState("");
@@ -196,6 +209,25 @@ export function HorasExtrasClient({
 
   return (
     <div>
+      {/* Tab toggle */}
+      <div style={{ display: "flex", gap: 2, marginBottom: 18, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, width: "fit-content" }}>
+        {(["he", "banco"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => handleTabChange(tab)}
+            style={{ padding: "6px 16px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, transition: "background 0.15s", background: activeTab === tab ? "var(--brand)" : "transparent", color: activeTab === tab ? "var(--primary-foreground)" : "var(--text-2)" }}
+          >
+            {tab === "he" ? "Horas Extras" : "Banco de Horas"}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "banco" ? (
+        <BancoHorasTab data={bancoData} loading={pending} />
+      ) : (
+      <div>
+
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 22 }}>
         <KpiCard icon={<Timer size={18} />} label="Total de horas" value={`${counts.totalHoras.toFixed(1)}h`} />
@@ -379,6 +411,66 @@ export function HorasExtrasClient({
           </div>
         </div>
       )}
+      </div>
+      )}
+    </div>
+  );
+}
+
+function BancoHorasTab({ data, loading }: { data: BancoHorasEntry[] | null; loading: boolean }) {
+  if (loading && data === null) {
+    return <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>Carregando banco de horas…</div>;
+  }
+  if (!data?.length) {
+    return <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-3)", fontSize: 13, background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8 }}>Nenhum saldo de banco de horas encontrado.</div>;
+  }
+
+  const totalH = data.reduce((s, e) => s + e.saldo_horas, 0);
+  const totalV = data.reduce((s, e) => s + (e.saldo_horas >= 0 ? e.valor_estimado : 0), 0);
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 22 }}>
+        <KpiCard icon={<Timer size={18} />} label="Saldo total (h)" value={`${totalH >= 0 ? "+" : ""}${totalH.toFixed(1)}h`} />
+        <KpiCard icon={<DollarSign size={18} />} label="Valor a pagar (est.)" value={formatBRL(totalV)} />
+        <KpiCard icon={<TrendingUp size={18} />} label="Com saldo positivo" value={data.filter((e) => e.saldo_horas > 0).length} />
+        <KpiCard icon={<TrendingDown size={18} />} label="Com débito" value={data.filter((e) => e.saldo_horas < 0).length} highlight />
+      </div>
+      <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", background: "var(--surface)" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                {["Colaborador", "Saldo (h)", "Valor est.", "Última atualização"].map((h, i) => (
+                  <th key={h} style={{ padding: "10px 14px", fontSize: 11, fontWeight: 700, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: 0.6, textAlign: i > 0 ? "right" : "left" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((e) => {
+                const pos = e.saldo_horas >= 0;
+                return (
+                  <tr key={e.employee_id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: "10px 14px" }}>
+                      <Link href={`/pessoas/colaboradores/${e.employee_id}`} style={{ fontWeight: 600, color: "var(--text)", textDecoration: "none" }}>{e.nome}</Link>
+                      <div style={{ fontSize: 11, color: "var(--text-3)" }}>{e.funcao}</div>
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: pos ? "#15803D" : "#B91C1C" }}>
+                      {pos ? "+" : ""}{e.saldo_horas.toFixed(1)}h
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontSize: 12, color: "var(--text-2)" }}>
+                      {pos ? formatBRL(e.valor_estimado) : "—"}
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "right", fontSize: 11, color: "var(--text-3)" }}>
+                      {e.ultimo_calculo ? new Date(e.ultimo_calculo).toLocaleDateString("pt-BR") : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

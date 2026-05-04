@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const { data: run, error: runErr } = await supabase
       .from("hos_runs")
       .insert({
-        job_id: job.id,
+        job_id: (job as any).id,
         status: "awaiting_approval", // Simulando que o script já rodou super rápido e quer aprovação
         payload: payload,
         logs: [
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: runErr.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, runId: run?.id });
+    return NextResponse.json({ ok: true, runId: (run as any)?.id });
   } catch (error) {
     console.error("[Orchestrator Webhook] Erro processando request:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

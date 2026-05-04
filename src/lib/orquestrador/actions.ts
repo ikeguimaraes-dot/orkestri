@@ -170,7 +170,7 @@ export async function mockCreateRun(jobSlug: string): Promise<ActionResult<HosRu
     const { data: runData, error: runErr } = await supabase
       .from("hos_runs")
       .insert({
-        job_id: job.id,
+        job_id: (job as any).id,
         status: "awaiting_approval",
         payload: {
           preview_url: "https://kph-os-preview-123.vercel.app",
