@@ -450,9 +450,6 @@ export function CardapioClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
-                      {brandFilter === "__all__" && brands.length > 1 && (
-                        <TableHead>Marca</TableHead>
-                      )}
                       <TableHead style={{ textAlign: "right" }}>Preço</TableHead>
                       <TableHead style={{ textAlign: "right" }}>Custo</TableHead>
                       <TableHead style={{ textAlign: "center" }}>CMV%</TableHead>
@@ -494,19 +491,6 @@ export function CardapioClient({
                             </div>
                           )}
                         </TableCell>
-                        {brandFilter === "__all__" && brands.length > 1 && (
-                          <TableCell>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: it.brand_color ?? "var(--text-2)",
-                              }}
-                            >
-                              {it.brand_name ?? "—"}
-                            </span>
-                          </TableCell>
-                        )}
                         <TableCell
                           style={{
                             textAlign: "right",
