@@ -211,8 +211,8 @@ function EditRow({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const qtd = parseFloat(d.quantidade.replace(",", ".")) || 0;
-  const custo = parseFloat(d.custo_unitario.replace(",", ".")) || 0;
+  const qtd = parseFloat(String(d.quantidade).replace(",", ".")) || 0;
+  const custo = parseFloat(String(d.custo_unitario).replace(",", ".")) || 0;
   const preview = qtd * custo;
 
   function set<K extends keyof RowDraft>(key: K, value: RowDraft[K]) {
@@ -225,7 +225,7 @@ function EditRow({
     setD((p) => ({
       ...p,
       insumo: ing.nome,
-      custo_unitario: ing.custo_padrao,
+      custo_unitario: String(ing.custo_padrao),
       unidade: ing.unidade_padrao,
     }));
     setErr(null);
@@ -248,7 +248,7 @@ function EditRow({
         insumo: d.insumo.trim(),
         unidade: d.unidade || null,
         quantidade: qtd,
-        perda_pct: d.perda_pct ? parseFloat(d.perda_pct.replace(",", ".")) : null,
+        perda_pct: d.perda_pct ? parseFloat(String(d.perda_pct).replace(",", ".")) : null,
         custo_unitario: custo,
       });
       if (!r.ok) { setErr(r.error); return; }
