@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { listOvertimeByUnit } from "@/lib/pessoas/actions";
+import { listOvertimeByUnit, listEmployees } from "@/lib/pessoas/actions";
 import { requireUser } from "@/lib/auth/server";
 import { getCurrentUnit } from "@/lib/auth/unit";
 import { HorasExtrasClient } from "./horas-extras-client";
@@ -15,10 +15,10 @@ export default async function HorasExtrasPage() {
           Pessoas · Horas Extras
         </div>
         <h1 style={{ fontSize: 26, fontWeight: 700, margin: "6px 0 4px", color: "var(--text)", letterSpacing: -0.4 }}>
-          Horas Extras da unit
+          Horas Extras · Controle e aprovação
         </h1>
         <p style={{ fontSize: 12, color: "var(--text-3)", margin: 0, lineHeight: 1.55, maxWidth: 720 }}>
-          Registros de horas extras com aprovação inline. Para lançar HE, acesse o perfil do colaborador.
+          Registro e aprovação de HE com cálculo automático de valor estimado (salário ÷ 220h × multiplicador).
         </p>
       </header>
       <Suspense fallback={<div style={{ color: "var(--text-3)", fontSize: 13 }}>Carregando…</div>}>
@@ -38,6 +38,28 @@ async function HorasExtrasSection() {
     );
   }
   const now = new Date();
-  const records = await listOvertimeByUnit(unit.id, now.getMonth() + 1, now.getFullYear());
-  return <HorasExtrasClient unitName={unit.name} records={records} defaultMes={now.getMonth() + 1} defaultAno={now.getFullYear()} />;
+  const [records, allEmployees] = await Promise.all([
+    listOvertimeByUnit(unit.id, now.getMonth() + 1, now.getFullYear()),
+    listEmployees(unit.id),
+  ]);
+  const employees = allEmployees
+    .filter((e) => e.ativo)
+    .map((e) => ({
+      id: e.id,
+      nome: e.nome,
+      sobrenome: e.sobrenome,
+      funcao: e.funcao,
+      salario_base: e.salario_base,
+    }));
+
+  return (
+    <HorasExtrasClient
+      unitId={unit.id}
+      unitName={unit.name}
+      records={records}
+      employees={employees}
+      defaultMes={now.getMonth() + 1}
+      defaultAno={now.getFullYear()}
+    />
+  );
 }

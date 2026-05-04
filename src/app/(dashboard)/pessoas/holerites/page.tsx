@@ -6,6 +6,7 @@ import { GenerateButton } from "@/components/pessoas/GenerateButton";
 import { listPayslips } from "@/lib/pessoas/actions";
 import { requireUser, isFounder } from "@/lib/auth/server";
 import { getCurrentUnit } from "@/lib/auth/unit";
+import { formatBRL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -88,23 +89,39 @@ async function PayslipsSection({
     return <EmptyState mes={mes} ano={ano} unitName={unit.name} />;
   }
 
+  const totalFolha = payslips.reduce((s, p) => s + parseFloat(p.liquido), 0);
+  const gerados = payslips.length;
+  const pendentes = payslips.filter((p) => p.status === "rascunho").length;
+  const pagos = payslips.filter((p) => p.status === "pago").length;
+
   return (
     <>
-      <p
-        style={{
-          fontSize: 12,
-          color: "var(--text-3)",
-          margin: "16px 0 14px",
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, margin: "20px 0" }}>
+        <HKpiCard label="Total líquido da folha" value={formatBRL(totalFolha)} accent />
+        <HKpiCard label="Holerites gerados" value={gerados} />
+        <HKpiCard label="Rascunhos / pendentes" value={pendentes} warn={pendentes > 0} />
+        <HKpiCard label="Pagos" value={pagos} />
+      </div>
+      <p style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 14px" }}>
         Folha de{" "}
-        <span style={{ color: "var(--text)", fontWeight: 600 }}>
-          {monthLabel(mes)}/{ano}
-        </span>{" "}
+        <span style={{ color: "var(--text)", fontWeight: 600 }}>{monthLabel(mes)}/{ano}</span>{" "}
         — {unit.name} · {payslips.length} holerite{payslips.length === 1 ? "" : "s"}
       </p>
       <PayslipsTable data={payslips} isFounder={canApprove} />
     </>
+  );
+}
+
+function HKpiCard({ label, value, accent, warn }: { label: string; value: string | number; accent?: boolean; warn?: boolean }) {
+  const bg = accent ? "var(--brand-soft)" : warn ? "rgba(245,158,11,0.14)" : "var(--surface-2)";
+  const fg = accent ? "var(--brand)" : warn ? "#A16207" : "var(--text-3)";
+  return (
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 16px" }}>
+      <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: accent ? "var(--brand)" : warn ? "#A16207" : "var(--text)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+        {value}
+      </div>
+    </div>
   );
 }
 

@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   CalendarX,
+  Gift,
   Loader2,
   Plus,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   TrendingDown,
   X,
@@ -102,8 +105,45 @@ export function DisciplinaTabs({
     [scores, selectedEmpId],
   );
 
+  const kpis = useMemo(() => {
+    const scoreMedio = scores.length
+      ? Math.round(scores.reduce((s, x) => s + x.score, 0) / scores.length)
+      : null;
+    const advertencias = warnings.length;
+    const abaixoDe70 = scores.filter((s) => s.score < 70).length;
+    const bonusNoMes = 0; // sem campo de tipo "bonus" específico disponível aqui
+    return { scoreMedio, advertencias, abaixoDe70, bonusNoMes };
+  }, [scores, warnings]);
+
   return (
     <>
+      {/* KPI Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14, marginBottom: 22 }}>
+        <DKpiCard
+          icon={<ShieldCheck size={18} />}
+          label="Score médio da unit"
+          value={kpis.scoreMedio != null ? `${kpis.scoreMedio}/100` : "—"}
+        />
+        <DKpiCard
+          icon={<TrendingDown size={18} />}
+          label="Advertências totais"
+          value={kpis.advertencias}
+          highlight={kpis.advertencias > 0}
+        />
+        <DKpiCard
+          icon={<AlertTriangle size={18} />}
+          label="Colabs score < 70"
+          value={kpis.abaixoDe70}
+          highlight={kpis.abaixoDe70 > 0}
+          highlightColor="red"
+        />
+        <DKpiCard
+          icon={<Gift size={18} />}
+          label="Faltas no período"
+          value={absences.length}
+        />
+      </div>
+
       <Tabs defaultValue="warnings">
         <TabsList variant="line">
           <TabsTrigger value="warnings">
@@ -1043,6 +1083,38 @@ function EmptyState({
       <p style={{ fontSize: 12, color: "var(--text-3)", maxWidth: 380, margin: 0, lineHeight: 1.55 }}>
         {desc}
       </p>
+    </div>
+  );
+}
+
+function DKpiCard({
+  icon,
+  label,
+  value,
+  highlight,
+  highlightColor = "yellow",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  highlight?: boolean;
+  highlightColor?: "yellow" | "red";
+}) {
+  const bg = highlight
+    ? highlightColor === "red" ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.14)"
+    : "var(--brand-soft)";
+  const fg = highlight
+    ? highlightColor === "red" ? "#B91C1C" : "#A16207"
+    : "var(--brand)";
+  return (
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 38, height: 38, borderRadius: 99, background: bg, color: fg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: 11, color: "var(--text-3)" }}>{label}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", fontVariantNumeric: "tabular-nums", lineHeight: 1, marginTop: 2 }}>{value}</div>
+      </div>
     </div>
   );
 }
