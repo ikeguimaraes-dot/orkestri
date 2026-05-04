@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -209,8 +209,6 @@ function EditRow({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => { console.log("[EditRow] montado/remontado"); }, []);
-
   const qtd = parseFloat(String(d.quantidade).replace(",", ".")) || 0;
   const custo = parseFloat(String(d.custo_unitario).replace(",", ".")) || 0;
   const preview = qtd * custo;
@@ -237,7 +235,6 @@ function EditRow({
   }
 
   async function save() {
-    console.log("[save] insumo:", JSON.stringify(d.insumo), "selectedIngredientIdRef:", selectedIngredientIdRef.current);
     if (!d.insumo.trim()) { setErr("Insumo obrigatório"); return; }
     setSaving(true);
     try {
@@ -328,7 +325,7 @@ function EditRow({
               size="icon"
               style={{ width: 28, height: 28 }}
               disabled={saving}
-              onClick={() => { console.log("SAVE CLICKED"); save(); }}
+              onClick={save}
             >
               {saving ? "…" : <Check size={14} />}
             </Button>

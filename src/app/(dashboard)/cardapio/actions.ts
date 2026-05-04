@@ -234,8 +234,6 @@ export async function upsertRecipeItem(
 
     if (!payload.insumo?.trim()) return { ok: false, error: "Insumo obrigatório" };
 
-    console.log("[upsertRecipeItem] payload.ingredient_id:", payload.ingredient_id, "id:", payload.id);
-
     const { id, ...rest } = payload;
     let q;
     if (id) {
