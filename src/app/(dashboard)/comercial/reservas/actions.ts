@@ -33,7 +33,7 @@ export async function createReservation(
     if (error || !data) return { ok: false, error: error?.message ?? "Falha ao criar" };
     revalidatePath("/comercial/reservas");
     return { ok: true, data };
-  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Erro" }; }
+  } catch (e) { console.error("[createReservation] exceção:", e); return { ok: false, error: e instanceof Error ? e.message : "Erro" }; }
 }
 
 export async function updateReservationStatus(

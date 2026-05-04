@@ -7,7 +7,7 @@ import { ReservasClient } from "./reservas-client";
 export const dynamic = "force-dynamic";
 
 export default async function ReservasPage() {
-  await requireUser();
+  const user = await requireUser();
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
       <header style={{ marginBottom: 20 }}>
@@ -22,13 +22,13 @@ export default async function ReservasPage() {
         </p>
       </header>
       <Suspense fallback={<div style={{ color: "var(--text-3)", fontSize: 13 }}>Carregando…</div>}>
-        <ReservasSection />
+        <ReservasSection userId={user.id} />
       </Suspense>
     </div>
   );
 }
 
-async function ReservasSection() {
+async function ReservasSection({ userId }: { userId: string }) {
   const unit = await getCurrentUnit();
   if (!unit) {
     return (
@@ -39,5 +39,5 @@ async function ReservasSection() {
   }
   const today = new Date().toISOString().slice(0, 10);
   const reservas = await listReservations(unit.id, today);
-  return <ReservasClient unitId={unit.id} unitName={unit.name} reservas={reservas} today={today} />;
+  return <ReservasClient unitId={unit.id} userId={userId} reservas={reservas} today={today} />;
 }

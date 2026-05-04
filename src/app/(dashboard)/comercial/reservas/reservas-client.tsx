@@ -122,11 +122,12 @@ const EMPTY_FORM = {
 
 export function ReservasClient({
   unitId,
+  userId,
   reservas,
   today,
 }: {
   unitId: string;
-  unitName: string;
+  userId: string;
   reservas: ReservationRow[];
   today: string;
 }) {
@@ -164,10 +165,12 @@ export function ReservasClient({
 
   function handleStatusAction(id: string, status: ReservationStatus) {
     startTransition(async () => {
-      const res = await updateReservationStatus(id, status, null);
-      if (res.ok) {
-        setRows((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
+      const res = await updateReservationStatus(id, status, userId);
+      if (!res.ok) {
+        alert(res.error ?? "Erro ao atualizar status");
+        return;
       }
+      setRows((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     });
   }
 
@@ -211,14 +214,12 @@ export function ReservasClient({
 
   return (
     <div>
-      {/* KPI cards */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <KpiCard label="Total do dia" value={totalDia} />
         <KpiCard label="Confirmadas" value={confirmadas} />
         <KpiCard label="Pendentes" value={pendentes} />
       </div>
 
-      {/* Filtros + nova reserva */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <input
           type="date"
@@ -257,11 +258,9 @@ export function ReservasClient({
           style={{ width: 240, height: 32, fontSize: 13 }}
         />
         <div style={{ marginLeft: "auto" }}>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger onClick={() => { setForm({ ...EMPTY_FORM, data: dateFilter }); setFormError(null); }}>
-              <Button size="sm">
-                + Nova Reserva
-              </Button>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { if (open) { setForm({ ...EMPTY_FORM, data: dateFilter }); setFormError(null); } setDialogOpen(open); }}>
+            <DialogTrigger render={<Button size="sm" />}>
+              + Nova Reserva
             </DialogTrigger>
             <DialogContent style={{ maxWidth: 520 }}>
               <DialogHeader>
@@ -416,12 +415,10 @@ export function ReservasClient({
         </div>
       </div>
 
-      {/* Estado de carregamento */}
       {pending && (
         <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 8 }}>Atualizando…</div>
       )}
 
-      {/* Tabela */}
       {filtered.length === 0 ? (
         <div style={{ background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, padding: "32px 22px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
           Nenhuma reserva encontrada para os filtros selecionados.
@@ -471,66 +468,36 @@ export function ReservasClient({
                   <TableCell>
                     {r.status === "pendente" && (
                       <div style={{ display: "flex", gap: 4 }}>
-                        <button
+                        <Button
+                          variant="outline"
+                          size="icon"
                           onClick={() => handleStatusAction(r.id, "confirmada")}
                           disabled={pending}
                           title="Confirmar"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 28,
-                            height: 28,
-                            borderRadius: 6,
-                            border: "1px solid var(--border)",
-                            background: "transparent",
-                            color: "#15803D",
-                            cursor: "pointer",
-                            padding: 0,
-                          }}
+                          style={{ color: "#15803D", width: 28, height: 28 }}
                         >
                           <Check size={13} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
                           onClick={() => handleStatusAction(r.id, "no_show")}
                           disabled={pending}
                           title="No-show"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 28,
-                            height: 28,
-                            borderRadius: 6,
-                            border: "1px solid var(--border)",
-                            background: "transparent",
-                            color: "#A16207",
-                            cursor: "pointer",
-                            padding: 0,
-                          }}
+                          style={{ color: "#A16207", width: 28, height: 28 }}
                         >
                           <Clock size={13} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
                           onClick={() => handleStatusAction(r.id, "cancelada")}
                           disabled={pending}
                           title="Cancelar"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 28,
-                            height: 28,
-                            borderRadius: 6,
-                            border: "1px solid var(--border)",
-                            background: "transparent",
-                            color: "#B91C1C",
-                            cursor: "pointer",
-                            padding: 0,
-                          }}
+                          style={{ color: "#B91C1C", width: 28, height: 28 }}
                         >
                           <X size={13} />
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </TableCell>
