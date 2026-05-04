@@ -256,7 +256,6 @@ export async function upsertRecipeItem(
     } else {
       const insertPayload = {
         menu_item_id: rest.menu_item_id,
-        unit_id: rest.unit_id ?? null,
         insumo: rest.insumo,
         unidade: rest.unidade ?? null,
         quantidade: rest.quantidade,

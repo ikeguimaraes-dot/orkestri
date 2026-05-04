@@ -205,6 +205,10 @@ function EditRow({
   const [d, setD] = useState<RowDraft>(draft);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Prevents the onChange callback from resetting ingredient_id immediately
+  // after handleSelectIngredient sets it (React may fire a synthetic change
+  // event when it reconciles the controlled Input to the new value).
+  const justSelectedRef = useRef(false);
 
   const qtd = parseFloat(d.quantidade.replace(",", ".")) || 0;
   const custo = parseFloat(d.custo_unitario.replace(",", ".")) || 0;
@@ -216,6 +220,7 @@ function EditRow({
   }
 
   function handleSelectIngredient(ing: Ingredient) {
+    justSelectedRef.current = true;
     setD((p) => ({
       ...p,
       ingredient_id: ing.id,
@@ -278,7 +283,10 @@ function EditRow({
         <TableCell>
           <IngredientSearch
             value={d.insumo}
-            onChange={(v) => setD((p) => ({ ...p, insumo: v, ingredient_id: null }))}
+            onChange={(v) => {
+              if (justSelectedRef.current) { justSelectedRef.current = false; return; }
+              setD((p) => ({ ...p, insumo: v, ingredient_id: null }));
+            }}
             onSelect={handleSelectIngredient}
           />
         </TableCell>

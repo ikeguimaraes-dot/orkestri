@@ -63,7 +63,6 @@ export const CARDAPIO_CATEGORIAS_SUGERIDAS = [
 export type RecipeItem = {
   id: string;
   menu_item_id: string;
-  unit_id: string | null;
   insumo: string;
   unidade: string | null;
   quantidade: number;
@@ -76,7 +75,6 @@ export type RecipeItem = {
 
 export type RecipeItemInsert = {
   menu_item_id: string;
-  unit_id?: string | null;
   insumo: string;
   unidade?: string | null;
   quantidade: number;
