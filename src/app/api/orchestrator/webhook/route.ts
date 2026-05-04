@@ -7,7 +7,6 @@ export async function POST(req: NextRequest) {
 
   const { event, deployment_url, pr_number, triggered_by = 'webhook' } = body
 
-  // Mapeia evento para o job correto
   const slugMap: Record<string, string> = {
     'deployment.preview': 'qa_preview',
     'pr.opened': 'code_review',
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Evento não reconhecido' }, { status: 400 })
   }
 
-  const { data: job } = await supabase
+  const { data: job } = await (supabase as any)
     .from('hos_jobs')
     .select('id')
     .eq('slug', slug)
@@ -27,10 +26,10 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (!job) {
-    return NextResponse.json({ error: 'Job não encontrado ou inativo' }, { status: 404 })
+    return NextResponse.json({ error: 'Job não encontrado' }, { status: 404 })
   }
 
-  const { data: run, error } = await supabase
+  const { data: run, error } = await (supabase as any)
     .from('hos_runs')
     .insert({
       job_id: job.id,
