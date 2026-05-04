@@ -2,7 +2,7 @@
 
 // Server Actions do módulo Cardápio (engenharia de cardápio / CMV).
 //
-// Tabela cmv_items em 010_financeiro.sql. cmv_pct é GENERATED — não enviar.
+// Tabela menu_items em 010_financeiro.sql. cmv_pct é GENERATED — não enviar.
 
 import { revalidatePath } from "next/cache";
 
@@ -12,27 +12,27 @@ import type { ActionResult } from "@/lib/result";
 import {
   cmvItemSchema,
   cmvItemUpdateSchema,
-  type CmvItemFormValues,
-  type CmvItemUpdateValues,
+  type MenuItemFormValues,
+  type MenuItemUpdateValues,
 } from "@/lib/cardapio/schema";
 import type {
-  CmvItem,
-  CmvItemWithBrand,
+  MenuItem,
+  MenuItemWithBrand,
   RecipeItem,
   RecipeItemInsert,
   RecipeItemUpdate,
   RecipeNote,
 } from "@/lib/cardapio/types";
 
-const TABLE = "cmv_items" as const;
+const TABLE = "menu_items" as const;
 
 /**
- * Lista todos os cmv_items das marcas que o user tem acesso.
+ * Lista todos os menu_items das marcas que o user tem acesso.
  * RLS já filtra por kph_has_role_for_brand. brandId opcional aplica filtro extra.
  */
-export async function listCmvItems(
+export async function listMenuItems(
   brandId?: string | null,
-): Promise<CmvItemWithBrand[]> {
+): Promise<MenuItemWithBrand[]> {
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return [];
@@ -45,12 +45,12 @@ export async function listCmvItems(
       .order("nome", { ascending: true });
     if (brandId) q = q.eq("brand_id", brandId);
 
-    type JoinRow = CmvItem & {
+    type JoinRow = MenuItem & {
       brand: { name: string; color: string } | { name: string; color: string }[] | null;
     };
     const { data, error } = await q.returns<JoinRow[]>();
     if (error) {
-      console.error("[listCmvItems]", error.message);
+      console.error("[listMenuItems]", error.message);
       return [];
     }
     return (data ?? []).map((r) => {
@@ -61,15 +61,15 @@ export async function listCmvItems(
         ...rest,
         brand_name: b?.name ?? null,
         brand_color: b?.color ?? null,
-      } as CmvItemWithBrand;
+      } as MenuItemWithBrand;
     });
   } catch (e) {
-    console.error("[listCmvItems] exceção:", e);
+    console.error("[listMenuItems] exceção:", e);
     return [];
   }
 }
 
-export async function getCmvItem(id: string): Promise<CmvItem | null> {
+export async function getMenuItem(id: string): Promise<MenuItem | null> {
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return null;
@@ -79,19 +79,19 @@ export async function getCmvItem(id: string): Promise<CmvItem | null> {
       .eq("id", id)
       .maybeSingle();
     if (error) {
-      console.error("[getCmvItem]", error.message);
+      console.error("[getMenuItem]", error.message);
       return null;
     }
-    return (data as CmvItem | null) ?? null;
+    return (data as MenuItem | null) ?? null;
   } catch (e) {
-    console.error("[getCmvItem] exceção:", e);
+    console.error("[getMenuItem] exceção:", e);
     return null;
   }
 }
 
-export async function createCmvItem(
-  input: CmvItemFormValues,
-): Promise<ActionResult<CmvItem>> {
+export async function createMenuItem(
+  input: MenuItemFormValues,
+): Promise<ActionResult<MenuItem>> {
   try {
     const parsed = cmvItemSchema.safeParse(input);
     if (!parsed.success) {
@@ -122,16 +122,16 @@ export async function createCmvItem(
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
     revalidatePath("/cardapio");
-    return { ok: true, data: data as CmvItem };
+    return { ok: true, data: data as MenuItem };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
   }
 }
 
-export async function updateCmvItem(
+export async function updateMenuItem(
   id: string,
-  patch: CmvItemUpdateValues,
-): Promise<ActionResult<CmvItem>> {
+  patch: MenuItemUpdateValues,
+): Promise<ActionResult<MenuItem>> {
   try {
     const parsed = cmvItemUpdateSchema.safeParse(patch);
     if (!parsed.success) {
@@ -151,15 +151,15 @@ export async function updateCmvItem(
 
     revalidatePath("/cardapio");
     revalidatePath(`/cardapio/${id}/editar`);
-    return { ok: true, data: data as CmvItem };
+    return { ok: true, data: data as MenuItem };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
   }
 }
 
-export async function toggleCmvItemAtivo(
+export async function toggleMenuItemAtivo(
   id: string,
-): Promise<ActionResult<CmvItem>> {
+): Promise<ActionResult<MenuItem>> {
   try {
     await requireUser();
     const supabase = await createSupabaseServerClient();
@@ -182,13 +182,13 @@ export async function toggleCmvItemAtivo(
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
     revalidatePath("/cardapio");
-    return { ok: true, data: data as CmvItem };
+    return { ok: true, data: data as MenuItem };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
   }
 }
 
-export async function deleteCmvItem(
+export async function deleteMenuItem(
   id: string,
 ): Promise<ActionResult<{ id: string }>> {
   try {
@@ -208,14 +208,14 @@ export async function deleteCmvItem(
 
 // ── Ficha técnica (recipe_items / recipe_notes) ───────────────
 
-export async function listRecipeItems(cmvItemId: string): Promise<RecipeItem[]> {
+export async function listRecipeItems(menuItemId: string): Promise<RecipeItem[]> {
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return [];
     const { data, error } = await supabase
       .from("recipe_items")
       .select("*")
-      .eq("cmv_item_id", cmvItemId)
+      .eq("menu_item_id", menuItemId)
       .order("created_at");
     if (error) { console.error("[listRecipeItems]", error.message); return []; }
     return (data ?? []) as RecipeItem[];
@@ -261,7 +261,7 @@ export async function upsertRecipeItem(
     const { data, error } = await q;
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidatePath(`/cardapio/${payload.cmv_item_id}`);
+    revalidatePath(`/cardapio/${payload.menu_item_id}`);
     revalidatePath("/cardapio");
     return { ok: true, data: data as RecipeItem };
   } catch (e) {
@@ -271,7 +271,7 @@ export async function upsertRecipeItem(
 
 export async function deleteRecipeItem(
   id: string,
-  cmvItemId: string,
+  menuItemId: string,
 ): Promise<ActionResult<{ id: string }>> {
   try {
     await requireUser();
@@ -281,7 +281,7 @@ export async function deleteRecipeItem(
     const { error } = await supabase.from("recipe_items").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
 
-    revalidatePath(`/cardapio/${cmvItemId}`);
+    revalidatePath(`/cardapio/${menuItemId}`);
     revalidatePath("/cardapio");
     return { ok: true, data: { id } };
   } catch (e) {
@@ -289,14 +289,14 @@ export async function deleteRecipeItem(
   }
 }
 
-export async function listRecipeNotes(cmvItemId: string): Promise<RecipeNote[]> {
+export async function listRecipeNotes(menuItemId: string): Promise<RecipeNote[]> {
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return [];
     const { data, error } = await supabase
       .from("recipe_notes")
       .select("*")
-      .eq("cmv_item_id", cmvItemId)
+      .eq("menu_item_id", menuItemId)
       .order("created_at", { ascending: false });
     if (error) { console.error("[listRecipeNotes]", error.message); return []; }
     return (data ?? []) as RecipeNote[];
@@ -307,7 +307,7 @@ export async function listRecipeNotes(cmvItemId: string): Promise<RecipeNote[]> 
 }
 
 export async function createRecipeNote(
-  cmvItemId: string,
+  menuItemId: string,
   nota: string,
 ): Promise<ActionResult<RecipeNote>> {
   try {
@@ -318,12 +318,12 @@ export async function createRecipeNote(
 
     const { data, error } = await supabase
       .from("recipe_notes")
-      .insert({ cmv_item_id: cmvItemId, nota: nota.trim(), created_by: user.id } as never)
+      .insert({ menu_item_id: menuItemId, nota: nota.trim(), created_by: user.id } as never)
       .select()
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidatePath(`/cardapio/${cmvItemId}`);
+    revalidatePath(`/cardapio/${menuItemId}`);
     return { ok: true, data: data as RecipeNote };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };

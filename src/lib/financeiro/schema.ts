@@ -213,7 +213,7 @@ export const createProjectionSchema = z
   });
 
 // ── CMV ────────────────────────────────────────────────────────
-export const createCmvItemSchema = z.object({
+export const createMenuItemSchema = z.object({
   brand_id: z.string().uuid(),
   unit_id: z.string().uuid().nullable().optional(),
   nome: z.string().min(1, "Nome obrigatório"),
@@ -227,7 +227,7 @@ export const createCmvItemSchema = z.object({
   observacoes: optionalText,
 });
 
-export type CreateCmvItemInput = z.input<typeof createCmvItemSchema>;
+export type CreateMenuItemInput = z.input<typeof createMenuItemSchema>;
 
-export const updateCmvItemSchema = createCmvItemSchema.partial();
-export type UpdateCmvItemInput = z.input<typeof updateCmvItemSchema>;
+export const updateMenuItemSchema = createMenuItemSchema.partial();
+export type UpdateMenuItemInput = z.input<typeof updateMenuItemSchema>;

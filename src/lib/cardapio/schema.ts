@@ -19,7 +19,7 @@ export const cmvItemSchema = z.object({
   observacoes: z.string().trim().max(2000).optional().nullable(),
 });
 
-export type CmvItemFormValues = z.infer<typeof cmvItemSchema>;
+export type MenuItemFormValues = z.infer<typeof cmvItemSchema>;
 
 export const cmvItemUpdateSchema = cmvItemSchema.partial().omit({ brand_id: true });
-export type CmvItemUpdateValues = z.infer<typeof cmvItemUpdateSchema>;
+export type MenuItemUpdateValues = z.infer<typeof cmvItemUpdateSchema>;

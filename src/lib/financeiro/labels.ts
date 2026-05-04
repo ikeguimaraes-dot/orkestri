@@ -179,7 +179,7 @@ export const SEVERITY_COLORS: Record<
   critico: STATUS_COLORS.rejeitado,
 };
 
-// Categorias de cmv_items (mesma vibe das categorias do menu de eventos).
+// Categorias de menu_items (mesma vibe das categorias do menu de eventos).
 export const CMV_CATEGORIA_OPTIONS: ReadonlyArray<string> = [
   "entrada",
   "prato_principal",

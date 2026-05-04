@@ -1825,7 +1825,7 @@ export type Database = {
           updated_at?: string;
         };
       };
-      cmv_items: {
+      menu_items: {
         Row: {
           id: string;
           brand_id: string;
@@ -2603,7 +2603,7 @@ export type AlertaRow = Views<"v_alertas">;
 export type FinancialPeriodRow = Tables<"financial_periods">;
 export type CashFlowProjectionRow = Tables<"cash_flow_projections">;
 export type CashFlowEntryRow = Tables<"cash_flow_entries">;
-export type CmvItemRow = Tables<"cmv_items">;
+export type MenuItemRow = Tables<"menu_items">;
 export type ApprovalRequestRow = Tables<"approval_requests">;
 export type BrandFinancialConfigRow = Tables<"brand_financial_config">;
 

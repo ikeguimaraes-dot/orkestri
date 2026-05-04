@@ -11,10 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CMV_CATEGORIA_OPTIONS } from "@/lib/financeiro/labels";
 import {
-  createCmvItemSchema,
-  type CreateCmvItemInput,
+  createMenuItemSchema,
+  type CreateMenuItemInput,
 } from "@/lib/financeiro/schema";
-import { createCmvItem } from "@/app/(dashboard)/financeiro/actions";
+import { createMenuItem } from "@/app/(dashboard)/financeiro/actions";
 
 type Props = {
   brandId: string;
@@ -27,8 +27,8 @@ export function CmvCreateForm({ brandId }: Props) {
   const [pending, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const form = useForm<CreateCmvItemInput>({
-    resolver: zodResolver(createCmvItemSchema),
+  const form = useForm<CreateMenuItemInput>({
+    resolver: zodResolver(createMenuItemSchema),
     defaultValues: {
       brand_id: brandId,
       unit_id: null,
@@ -49,10 +49,10 @@ export function CmvCreateForm({ brandId }: Props) {
     reset,
   } = form;
 
-  function onSubmit(data: CreateCmvItemInput) {
+  function onSubmit(data: CreateMenuItemInput) {
     setSubmitError(null);
     startTransition(async () => {
-      const r = await createCmvItem(data);
+      const r = await createMenuItem(data);
       if (!r.ok) {
         setSubmitError(r.error);
         return;

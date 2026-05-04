@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/server";
 import {
   getBrandBySlug,
   getCmvDashboard,
-  getCmvItems,
+  getMenuItems,
 } from "../../actions";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { SeverityBadge } from "@/components/financeiro/SeverityBadge";
@@ -48,7 +48,7 @@ export default async function CmvPage({
 
   const [dash, items] = await Promise.all([
     getCmvDashboard(brand.id),
-    getCmvItems(brand.id, filters),
+    getMenuItems(brand.id, filters),
   ]);
 
   return (

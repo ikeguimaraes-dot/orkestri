@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
 import {
-  getCmvItem,
+  getMenuItem,
   listRecipeItems,
   listRecipeNotes,
 } from "@/app/(dashboard)/cardapio/actions";
@@ -17,7 +17,7 @@ export default async function FichaTecnicaPage({ params }: Props) {
   await requireUser();
   const { id } = await params;
   const [item, recipeItems, notes] = await Promise.all([
-    getCmvItem(id),
+    getMenuItem(id),
     listRecipeItems(id),
     listRecipeNotes(id),
   ]);

@@ -1,11 +1,11 @@
 // Tipos do módulo Cardápio (engenharia de cardápio).
-// Espelha tabela `cmv_items` em supabase/migrations/010_financeiro.sql.
+// Espelha tabela `menu_items` em supabase/migrations/010_financeiro.sql.
 //
 // NUMERIC do Postgres vem como string no JSON da API REST. Aqui usamos
 // number direto (Database<T>.Row já tipa como number) — converter quando
 // necessário no boundary das actions.
 
-export type CmvItem = {
+export type MenuItem = {
   id: string;
   brand_id: string;
   unit_id: string | null;
@@ -22,7 +22,7 @@ export type CmvItem = {
   updated_at: string;
 };
 
-export type CmvItemInsert = {
+export type MenuItemInsert = {
   id?: string;
   brand_id: string;
   unit_id?: string | null;
@@ -36,9 +36,9 @@ export type CmvItemInsert = {
   criado_por?: string | null;
 };
 
-export type CmvItemUpdate = Partial<Omit<CmvItemInsert, "brand_id">>;
+export type MenuItemUpdate = Partial<Omit<MenuItemInsert, "brand_id">>;
 
-export type CmvItemWithBrand = CmvItem & {
+export type MenuItemWithBrand = MenuItem & {
   brand_name: string | null;
   brand_color: string | null;
 };
@@ -62,7 +62,7 @@ export const CARDAPIO_CATEGORIAS_SUGERIDAS = [
 
 export type RecipeItem = {
   id: string;
-  cmv_item_id: string;
+  menu_item_id: string;
   unit_id: string | null;
   insumo: string;
   unidade: string | null;
@@ -73,7 +73,7 @@ export type RecipeItem = {
 };
 
 export type RecipeItemInsert = {
-  cmv_item_id: string;
+  menu_item_id: string;
   unit_id?: string | null;
   insumo: string;
   unidade?: string | null;
@@ -81,11 +81,11 @@ export type RecipeItemInsert = {
   custo_unitario: number;
 };
 
-export type RecipeItemUpdate = Partial<Omit<RecipeItemInsert, "cmv_item_id">>;
+export type RecipeItemUpdate = Partial<Omit<RecipeItemInsert, "menu_item_id">>;
 
 export type RecipeNote = {
   id: string;
-  cmv_item_id: string;
+  menu_item_id: string;
   nota: string;
   created_by: string | null;
   created_at: string;

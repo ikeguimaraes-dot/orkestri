@@ -1,6 +1,7 @@
 -- KPH OS — 010_financeiro.sql
 -- Fase E4 — módulo Financeiro: períodos, projeção, lançamentos, CMV,
 -- aprovações, config por marca + DRE/gap/CMV/aprovações em views.
+-- DEPRECATED: cmv_items renamed to menu_items in migration 028 (nunca rodou em produção).
 --
 -- Aditivo: zero ALTER em tabelas existentes.
 -- Idempotente: tipos via DO/EXCEPTION, CREATE TABLE IF NOT EXISTS,

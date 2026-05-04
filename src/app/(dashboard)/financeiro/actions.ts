@@ -6,13 +6,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/server";
 import type { ActionResult } from "@/lib/result";
 import {
-  createCmvItemSchema,
+  createMenuItemSchema,
   createEntrySchema,
   createPeriodSchema,
-  updateCmvItemSchema,
-  type CreateCmvItemInput,
+  updateMenuItemSchema,
+  type CreateMenuItemInput,
   type CreateEntryInput,
-  type UpdateCmvItemInput,
+  type UpdateMenuItemInput,
 } from "@/lib/financeiro/schema";
 import { getCompetenciaAtual } from "@/lib/financeiro/utils";
 import type {
@@ -22,7 +22,7 @@ import type {
   BrandFinancialConfigRow,
   CashFlowEntryRow,
   CmvDashboardRow,
-  CmvItemRow,
+  MenuItemRow,
   DreConsolidadoRow,
   FinancialPeriodRow,
   GapProjecaoRealizadoRow,
@@ -490,15 +490,15 @@ export async function getCmvDashboard(
   }
 }
 
-export async function getCmvItems(
+export async function getMenuItems(
   brandId: string,
   filters?: CmvFilters,
-): Promise<CmvItemRow[]> {
+): Promise<MenuItemRow[]> {
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return [];
     let query = supabase
-      .from("cmv_items")
+      .from("menu_items")
       .select("*")
       .eq("brand_id", brandId)
       .eq("ativo", true)
@@ -508,25 +508,25 @@ export async function getCmvItems(
     if (filters?.categoria) query = query.eq("categoria", filters.categoria);
     const { data, error } = await query;
     if (error) {
-      console.error("[getCmvItems] error:", error.message);
+      console.error("[getMenuItems] error:", error.message);
       return [];
     }
-    return (data ?? []) as CmvItemRow[];
+    return (data ?? []) as MenuItemRow[];
   } catch (e) {
-    console.error("[getCmvItems] exceção:", e);
+    console.error("[getMenuItems] exceção:", e);
     return [];
   }
 }
 
-export async function createCmvItem(
-  input: CreateCmvItemInput,
+export async function createMenuItem(
+  input: CreateMenuItemInput,
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const user = await requireUser();
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { ok: false, error: "Supabase indisponível" };
 
-    const parsed = createCmvItemSchema.safeParse(input);
+    const parsed = createMenuItemSchema.safeParse(input);
     if (!parsed.success) {
       const first = parsed.error.issues[0];
       return {
@@ -537,7 +537,7 @@ export async function createCmvItem(
     const data = parsed.data;
 
     const { data: created, error } = await supabase
-      .from("cmv_items")
+      .from("menu_items")
       .insert({
         ...data,
         criado_por: user.id,
@@ -557,21 +557,21 @@ export async function createCmvItem(
   }
 }
 
-export async function updateCmvItem(
+export async function updateMenuItem(
   id: string,
-  input: UpdateCmvItemInput,
+  input: UpdateMenuItemInput,
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { ok: false, error: "Supabase indisponível" };
 
-    const parsed = updateCmvItemSchema.safeParse(input);
+    const parsed = updateMenuItemSchema.safeParse(input);
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     }
 
     const { error } = await supabase
-      .from("cmv_items")
+      .from("menu_items")
       .update(parsed.data as never)
       .eq("id", id);
     if (error) {

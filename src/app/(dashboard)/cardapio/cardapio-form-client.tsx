@@ -15,13 +15,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  createCmvItem,
-  updateCmvItem,
+  createMenuItem,
+  updateMenuItem,
 } from "@/app/(dashboard)/cardapio/actions";
 import {
   CARDAPIO_CATEGORIAS_SUGERIDAS,
   classifyCmv,
-  type CmvItem,
+  type MenuItem,
 } from "@/lib/cardapio/types";
 import type { BrandOption } from "@/lib/eventos/types";
 import Link from "next/link";
@@ -29,7 +29,7 @@ import Link from "next/link";
 type Props = {
   mode: "create" | "edit";
   brands: BrandOption[];
-  initial?: CmvItem;
+  initial?: MenuItem;
 };
 
 const SEVERITY_FG = {
@@ -85,7 +85,7 @@ export function CardapioFormClient({ mode, brands, initial }: Props) {
 
     startTransition(async () => {
       if (mode === "create") {
-        const r = await createCmvItem({
+        const r = await createMenuItem({
           brand_id: brandId,
           nome: nome.trim(),
           categoria: categoria.trim(),
@@ -103,7 +103,7 @@ export function CardapioFormClient({ mode, brands, initial }: Props) {
         router.refresh();
       } else {
         if (!initial) return;
-        const r = await updateCmvItem(initial.id, {
+        const r = await updateMenuItem(initial.id, {
           nome: nome.trim(),
           categoria: categoria.trim(),
           preco_venda: precoNum,

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
-import { listCmvItems } from "@/app/(dashboard)/cardapio/actions";
+import { listMenuItems } from "@/app/(dashboard)/cardapio/actions";
 import { listAccessibleBrands } from "@/app/(dashboard)/eventos/actions";
 import { requireUser } from "@/lib/auth/server";
 import { CardapioClient } from "./cardapio-client";
@@ -13,7 +13,7 @@ export default async function CardapioPage() {
   await requireUser();
 
   const [items, brands] = await Promise.all([
-    listCmvItems(),
+    listMenuItems(),
     listAccessibleBrands(),
   ]);
 

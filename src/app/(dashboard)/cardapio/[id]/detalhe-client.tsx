@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/table";
 import { formatBRL } from "@/lib/format";
 import { classifyCmv, type CmvSeverity } from "@/lib/cardapio/types";
-import type { CmvItem, RecipeItem, RecipeNote } from "@/lib/cardapio/types";
+import type { MenuItem, RecipeItem, RecipeNote } from "@/lib/cardapio/types";
 import {
   upsertRecipeItem,
   deleteRecipeItem,
@@ -77,8 +77,8 @@ type RowDraft = {
   custo_unitario: string;
 };
 
-function emptyDraft(cmvItemId?: string): RowDraft {
-  void cmvItemId;
+function emptyDraft(menuItemId?: string): RowDraft {
+  void menuItemId;
   return { insumo: "", unidade: "", quantidade: "", custo_unitario: "" };
 }
 
@@ -96,12 +96,12 @@ function rowFromItem(r: RecipeItem): RowDraft {
 
 function EditRow({
   draft,
-  cmvItemId,
+  menuItemId,
   onSave,
   onCancel,
 }: {
   draft: RowDraft;
-  cmvItemId: string;
+  menuItemId: string;
   onSave: (saved: RecipeItem) => void;
   onCancel: () => void;
 }) {
@@ -119,7 +119,7 @@ function EditRow({
     setSaving(true);
     const r = await upsertRecipeItem({
       id: d.id,
-      cmv_item_id: cmvItemId,
+      menu_item_id: menuItemId,
       insumo: d.insumo.trim(),
       unidade: d.unidade.trim() || null,
       quantidade: qtd,
@@ -193,7 +193,7 @@ export function DetalheFichaClient({
   initialItems,
   initialNotes,
 }: {
-  item: CmvItem;
+  item: MenuItem;
   initialItems: RecipeItem[];
   initialNotes: RecipeNote[];
 }) {
@@ -394,7 +394,7 @@ export function DetalheFichaClient({
                 <EditRow
                   key={r.id}
                   draft={rowFromItem(r)}
-                  cmvItemId={item.id}
+                  menuItemId={item.id}
                   onSave={handleRowSaved}
                   onCancel={() => setEditingId(null)}
                 />
@@ -484,7 +484,7 @@ export function DetalheFichaClient({
             {editingId === "new" && (
               <EditRow
                 draft={emptyDraft()}
-                cmvItemId={item.id}
+                menuItemId={item.id}
                 onSave={handleRowSaved}
                 onCancel={() => setEditingId(null)}
               />

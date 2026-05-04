@@ -45,10 +45,10 @@ import {
 import { formatBRL } from "@/lib/format";
 import { downloadCsv } from "@/lib/export";
 import {
-  deleteCmvItem,
-  toggleCmvItemAtivo,
+  deleteMenuItem,
+  toggleMenuItemAtivo,
 } from "@/app/(dashboard)/cardapio/actions";
-import type { CmvItemWithBrand } from "@/lib/cardapio/types";
+import type { MenuItemWithBrand } from "@/lib/cardapio/types";
 import { classifyCmv } from "@/lib/cardapio/types";
 import type { BrandOption } from "@/lib/eventos/types";
 
@@ -146,7 +146,7 @@ export function CardapioClient({
   items,
   brands,
 }: {
-  items: CmvItemWithBrand[];
+  items: MenuItemWithBrand[];
   brands: BrandOption[];
 }) {
   const router = useRouter();
@@ -205,7 +205,7 @@ export function CardapioClient({
 
   // Agrupa por categoria pra render.
   const grouped = useMemo(() => {
-    const map = new Map<string, CmvItemWithBrand[]>();
+    const map = new Map<string, MenuItemWithBrand[]>();
     for (const it of filtered) {
       const arr = map.get(it.categoria) ?? [];
       arr.push(it);
@@ -216,7 +216,7 @@ export function CardapioClient({
 
   function handleToggle(id: string) {
     startTransition(async () => {
-      await toggleCmvItemAtivo(id);
+      await toggleMenuItemAtivo(id);
       router.refresh();
     });
   }
@@ -224,7 +224,7 @@ export function CardapioClient({
   function handleDelete(id: string, nome: string) {
     if (!window.confirm(`Excluir o item "${nome}"? Essa ação não pode ser desfeita.`)) return;
     startTransition(async () => {
-      const r = await deleteCmvItem(id);
+      const r = await deleteMenuItem(id);
       if (!r.ok) window.alert(`Falha ao excluir: ${r.error}`);
       router.refresh();
     });

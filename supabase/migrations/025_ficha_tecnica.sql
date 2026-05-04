@@ -1,5 +1,6 @@
 -- KPH OS — 025_ficha_tecnica.sql
 -- Sprint 5 / Etapa 2 — ficha técnica detalhada de cardápio.
+-- DEPRECATED: cmv_items/cmv_item_id renamed to menu_items/menu_item_id in migration 028 (nunca rodou em produção).
 --
 -- Pré-req: 010 (financeiro / cmv_items).
 --

@@ -10,15 +10,15 @@ import type {
   Ingredient,
 } from "@/types/compras-ingredientes";
 
-function revalidateCardapio(cmvItemId: string) {
-  revalidatePath(`/cardapio/${cmvItemId}`);
+function revalidateCardapio(menuItemId: string) {
+  revalidatePath(`/cardapio/${menuItemId}`);
   revalidatePath("/cardapio");
 }
 
 // ── Queries ───────────────────────────────────────────────────
 
 export async function listRecipeItemsWithIngredients(
-  cmvItemId: string,
+  menuItemId: string,
 ): Promise<RecipeItemWithIngredient[]> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -31,7 +31,7 @@ export async function listRecipeItemsWithIngredients(
     const { data, error } = await supabase
       .from("recipe_items")
       .select("*, ingredient:ingredients(*)")
-      .eq("cmv_item_id", cmvItemId)
+      .eq("menu_item_id", menuItemId)
       .order("created_at")
       .returns<JoinRow[]>();
 
@@ -49,7 +49,7 @@ export async function listRecipeItemsWithIngredients(
   }
 }
 
-export async function getRecipeCostBreakdown(cmvItemId: string): Promise<{
+export async function getRecipeCostBreakdown(menuItemId: string): Promise<{
   total_cost: number;
   by_categoria: Record<string, number>;
   items: Array<{
@@ -60,7 +60,7 @@ export async function getRecipeCostBreakdown(cmvItemId: string): Promise<{
     pct_total: number;
   }>;
 }> {
-  const rows = await listRecipeItemsWithIngredients(cmvItemId);
+  const rows = await listRecipeItemsWithIngredients(menuItemId);
   const total = rows.reduce((s, r) => s + Number(r.custo_total), 0);
 
   const by_categoria: Record<string, number> = {};
@@ -83,7 +83,7 @@ export async function getRecipeCostBreakdown(cmvItemId: string): Promise<{
 // ── Mutations ─────────────────────────────────────────────────
 
 export async function addRecipeItemWithIngredient(input: {
-  cmv_item_id: string;
+  menu_item_id: string;
   ingredient_id?: string | null;
   insumo?: string;
   quantidade: number;
@@ -116,7 +116,7 @@ export async function addRecipeItemWithIngredient(input: {
     if (input.quantidade <= 0) return { ok: false, error: "Quantidade deve ser > 0" };
 
     const payload = {
-      cmv_item_id: input.cmv_item_id,
+      menu_item_id: input.menu_item_id,
       ingredient_id: input.ingredient_id ?? null,
       insumo: insumoName.trim(),
       quantidade: input.quantidade,
@@ -132,7 +132,7 @@ export async function addRecipeItemWithIngredient(input: {
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidateCardapio(input.cmv_item_id);
+    revalidateCardapio(input.menu_item_id);
     return { ok: true, data: data as RecipeItemExtended };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
@@ -141,7 +141,7 @@ export async function addRecipeItemWithIngredient(input: {
 
 export async function updateRecipeItemExtended(
   id: string,
-  cmvItemId: string,
+  menuItemId: string,
   patch: {
     insumo?: string;
     quantidade?: number;
@@ -164,7 +164,7 @@ export async function updateRecipeItemExtended(
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidateCardapio(cmvItemId);
+    revalidateCardapio(menuItemId);
     return { ok: true, data: data as RecipeItemExtended };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
@@ -173,7 +173,7 @@ export async function updateRecipeItemExtended(
 
 export async function removeRecipeItemExtended(
   id: string,
-  cmvItemId: string,
+  menuItemId: string,
 ): Promise<ActionResult<{ id: string }>> {
   try {
     await requireUser();
@@ -183,7 +183,7 @@ export async function removeRecipeItemExtended(
     const { error } = await supabase.from("recipe_items").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
 
-    revalidateCardapio(cmvItemId);
+    revalidateCardapio(menuItemId);
     return { ok: true, data: { id } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
@@ -192,7 +192,7 @@ export async function removeRecipeItemExtended(
 
 export async function linkRecipeItemToIngredient(
   recipeItemId: string,
-  cmvItemId: string,
+  menuItemId: string,
   ingredientId: string | null,
 ): Promise<ActionResult<RecipeItemExtended>> {
   try {
@@ -219,7 +219,7 @@ export async function linkRecipeItemToIngredient(
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidateCardapio(cmvItemId);
+    revalidateCardapio(menuItemId);
     return { ok: true, data: data as RecipeItemExtended };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
@@ -227,8 +227,8 @@ export async function linkRecipeItemToIngredient(
 }
 
 export async function duplicateRecipe(
-  sourceCmvItemId: string,
-  targetCmvItemId: string,
+  sourceMenuItemId: string,
+  targetMenuItemId: string,
 ): Promise<ActionResult<{ count: number }>> {
   try {
     await requireUser();
@@ -238,16 +238,16 @@ export async function duplicateRecipe(
     const { data: sourceItems, error: readErr } = await supabase
       .from("recipe_items")
       .select("insumo, unidade, quantidade, custo_unitario, ingredient_id, perda_pct")
-      .eq("cmv_item_id", sourceCmvItemId);
+      .eq("menu_item_id", sourceMenuItemId);
     if (readErr) return { ok: false, error: readErr.message };
     if (!sourceItems?.length) return { ok: false, error: "Receita de origem sem itens" };
 
     type SourceRow = { insumo: string; unidade: string | null; quantidade: string; custo_unitario: string; ingredient_id: string | null; perda_pct: string | null };
-    const inserts = (sourceItems as SourceRow[]).map((r) => ({ ...r, cmv_item_id: targetCmvItemId }));
+    const inserts = (sourceItems as SourceRow[]).map((r) => ({ ...r, menu_item_id: targetMenuItemId }));
     const { error: insertErr } = await supabase.from("recipe_items").insert(inserts as never);
     if (insertErr) return { ok: false, error: insertErr.message };
 
-    revalidateCardapio(targetCmvItemId);
+    revalidateCardapio(targetMenuItemId);
     return { ok: true, data: { count: inserts.length } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
@@ -257,7 +257,7 @@ export async function duplicateRecipe(
 // ── Recipe notes ──────────────────────────────────────────────
 
 export async function addRecipeNote(
-  cmvItemId: string,
+  menuItemId: string,
   nota: string,
 ): Promise<ActionResult<{ id: string; nota: string; created_at: string }>> {
   try {
@@ -269,7 +269,7 @@ export async function addRecipeNote(
     const { data, error } = await supabase
       .from("recipe_notes")
       .insert({
-        cmv_item_id: cmvItemId,
+        menu_item_id: menuItemId,
         nota: nota.trim(),
         created_by: user.id === "bypass" ? null : user.id,
       } as never)
@@ -277,7 +277,7 @@ export async function addRecipeNote(
       .single();
     if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
 
-    revalidateCardapio(cmvItemId);
+    revalidateCardapio(menuItemId);
     return { ok: true, data: data as { id: string; nota: string; created_at: string } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
@@ -286,7 +286,7 @@ export async function addRecipeNote(
 
 export async function removeRecipeNote(
   noteId: string,
-  cmvItemId: string,
+  menuItemId: string,
 ): Promise<ActionResult<{ id: string }>> {
   try {
     await requireUser();
@@ -296,7 +296,7 @@ export async function removeRecipeNote(
     const { error } = await supabase.from("recipe_notes").delete().eq("id", noteId);
     if (error) return { ok: false, error: error.message };
 
-    revalidateCardapio(cmvItemId);
+    revalidateCardapio(menuItemId);
     return { ok: true, data: { id: noteId } };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };

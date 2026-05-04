@@ -61,7 +61,7 @@ export type IngredientUpdate = Partial<Omit<IngredientInsert, "group_id">>;
 // RecipeItem estendido — inclui ingredient_id e perda_pct da migration 028.
 export interface RecipeItemExtended {
   id: string;
-  cmv_item_id: string;
+  menu_item_id: string;
   unit_id: string | null;
   insumo: string;
   unidade: string | null;
