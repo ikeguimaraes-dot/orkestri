@@ -15,7 +15,7 @@ export type PerformanceKpis = {
 
 type OTKpiRow = {
   id: string;
-  hours: unknown;
+  hours: number | string | null;
   approved: boolean | null;
 };
 
@@ -70,6 +70,11 @@ export async function getPerformanceKpis(
       .returns<CheckKpiRow[]>(),
   ]);
 
+  if (empRes.error) console.error("[getPerformanceKpis] employees:", empRes.error.message);
+  if (faltasRes.error) console.error("[getPerformanceKpis] absences:", faltasRes.error.message);
+  if (heRes.error) console.error("[getPerformanceKpis] overtime:", heRes.error.message);
+  if (checkRes.error) console.error("[getPerformanceKpis] checklists:", checkRes.error.message);
+
   const employees = empRes.data ?? [];
   const faltas = faltasRes.data ?? [];
   const hes = heRes.data ?? [];
@@ -77,7 +82,7 @@ export async function getPerformanceKpis(
 
   const headcountAtivo = employees.length;
   const faltasMes = faltas.length;
-  const diasUteis = 22;
+  const diasUteis = 22; // approximation; exact calendar calc not yet implemented
   const absenteismoPct =
     headcountAtivo > 0
       ? Math.round((faltasMes / (headcountAtivo * diasUteis)) * 100 * 10) / 10
@@ -92,12 +97,12 @@ export async function getPerformanceKpis(
     .map(([funcao, count]) => ({ funcao, count }))
     .sort((a, b) => b.count - a.count);
 
-  const heHorasMes = hes.reduce((s, h) => s + Number(h.hours), 0);
+  const heHorasMes = hes.reduce((s, h) => s + (h.hours == null ? 0 : Number(h.hours)), 0);
   const hePendentes = hes.filter((h) => h.approved === null).length;
 
   const checklistScoreMedio =
     checks.length > 0
-      ? Math.round(checks.reduce((s, c) => s + (c.score_pct ?? 0), 0) / checks.length)
+      ? Math.round(checks.reduce((s, c) => s + c.score_pct!, 0) / checks.length)
       : null;
 
   return {

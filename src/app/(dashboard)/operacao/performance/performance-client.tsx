@@ -1,5 +1,6 @@
 // src/app/(dashboard)/operacao/performance/performance-client.tsx
 "use client";
+import type { ReactNode } from "react";
 import { Users, UserX, Clock, ClipboardCheck } from "lucide-react";
 import type { PerformanceKpis } from "./actions";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -16,22 +17,21 @@ function scoreBadge(score: number | null) {
 export function PerformanceClient({
   unitName,
   kpis,
-  defaultMes,
-  defaultAno,
+  mes,
+  ano,
 }: {
   unitName: string;
   kpis: PerformanceKpis;
-  defaultMes: number;
-  defaultAno: number;
+  mes: number;
+  ano: number;
 }) {
   const badge = scoreBadge(kpis.checklistScoreMedio);
   return (
     <div>
       <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 18 }}>
-        {unitName} · {MESES[defaultMes - 1]}/{defaultAno}
+        {unitName} · {MESES[mes - 1]}/{ano}
       </div>
 
-      {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 28 }}>
         <KpiCard icon={<Users size={18} />} label="Headcount ativo" value={kpis.headcountAtivo} />
         <KpiCard
@@ -65,7 +65,6 @@ export function PerformanceClient({
         </div>
       </div>
 
-      {/* Headcount por função */}
       {kpis.headcountPorFuncao.length > 0 && (
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>Headcount por função</div>
@@ -91,7 +90,7 @@ export function PerformanceClient({
   );
 }
 
-function KpiCard({ icon, label, value, sub, highlight }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; highlight?: boolean }) {
+function KpiCard({ icon, label, value, sub, highlight }: { icon: ReactNode; label: string; value: string | number; sub?: string; highlight?: boolean }) {
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ width: 38, height: 38, borderRadius: 99, background: highlight ? "rgba(245,158,11,0.14)" : "var(--brand-soft)", color: highlight ? "#A16207" : "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

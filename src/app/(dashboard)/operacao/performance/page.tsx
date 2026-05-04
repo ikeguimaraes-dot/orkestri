@@ -40,5 +40,5 @@ async function PerformanceSection() {
   }
   const hoje = new Date();
   const kpis = await getPerformanceKpis(unit.id, hoje.getMonth() + 1, hoje.getFullYear());
-  return <PerformanceClient unitName={unit.name} kpis={kpis} defaultMes={hoje.getMonth() + 1} defaultAno={hoje.getFullYear()} />;
+  return <PerformanceClient unitName={unit.name} kpis={kpis} mes={hoje.getMonth() + 1} ano={hoje.getFullYear()} />;
 }
