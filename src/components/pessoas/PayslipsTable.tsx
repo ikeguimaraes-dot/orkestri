@@ -10,7 +10,6 @@ import {
   CircleDollarSign,
   Download,
   ExternalLink,
-  FileDown,
   Search,
 } from "lucide-react";
 import {
@@ -251,17 +250,9 @@ export function PayslipsTable({
                 </Button>
               )}
               <a
-                href={`/api/holerites/${p.id}/pdf`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonVariants({ variant: "ghost", size: "sm" })}
-                title="Baixar PDF"
-              >
-                <FileDown className="h-3.5 w-3.5" />
-              </a>
-              <a
                 href={`/pessoas/holerites/${p.id}`}
                 className={buttonVariants({ variant: "ghost", size: "sm" })}
+                title="Ver holerite"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>

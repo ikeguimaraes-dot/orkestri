@@ -7,12 +7,11 @@ import {
   ArrowLeft,
   CheckCircle2,
   CircleDollarSign,
-  Download,
   Loader2,
   Printer,
 } from "lucide-react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { approvePayslip, markPayslipPaid } from "@/lib/pessoas/actions";
 import { formatBRL } from "@/lib/format";
 import type { PayslipStatus, PayslipWithEmployee } from "@/types/pessoas";
@@ -186,19 +185,10 @@ export function PayslipDetail({
               Marcar como pago
             </Button>
           )}
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button onClick={() => window.print()}>
             <Printer className="mr-2 h-4 w-4" />
-            Imprimir
+            Imprimir / Salvar PDF
           </Button>
-          <a
-            href={`/api/holerites/${payslip.id}/pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants()}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Baixar PDF
-          </a>
         </div>
       </header>
 
