@@ -13,7 +13,12 @@ export default async function OrchestratorPage() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Orquestrador HOS</h2>
         <div className="flex items-center space-x-2">
-          {/* Pode adicionar um botão de refresh ou disparar job manual */}
+          <Link
+            href="/orquestrador/insights"
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+          >
+            Insights
+          </Link>
         </div>
       </div>
 

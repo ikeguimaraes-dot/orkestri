@@ -149,6 +149,193 @@ export async function submitRunDecision(
   }
 }
 
+// ── Insight Types ──────────────────────────────────────────────────
+
+export type HosInsight = {
+  id: string;
+  period_start: string;
+  period_end: string;
+  report_md: string;
+  metrics: Record<string, unknown>;
+  created_at: string;
+};
+
+// ── Insight Actions ────────────────────────────────────────────────
+
+/**
+ * Busca runs e aprovações dos últimos 7 dias, monta métricas,
+ * chama a Claude API e salva o relatório em hos_insights.
+ */
+export async function generateWeeklyInsight(): Promise<ActionResult<HosInsight>> {
+  try {
+    const user = await requireUser();
+    if (!user) return { ok: false, error: "Não autorizado" };
+
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const periodEnd = new Date();
+    const periodStart = new Date(periodEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const { data: runs } = await supabase
+      .from("hos_runs")
+      .select("*, job:hos_jobs(name, slug)")
+      .gte("created_at", periodStart.toISOString())
+      .order("created_at", { ascending: true });
+
+    const { data: approvals } = await supabase
+      .from("hos_approvals")
+      .select("run_id, decision, created_at")
+      .gte("created_at", periodStart.toISOString());
+
+    const runList = (runs ?? []) as any[];
+    const approvalList = (approvals ?? []) as any[];
+
+    const approvalByRun = Object.fromEntries(approvalList.map((a) => [a.run_id, a]));
+
+    const totalRuns = runList.length;
+    const approved = runList.filter((r) => r.status === "approved").length;
+    const rejected = runList.filter((r) => r.status === "rejected").length;
+    const pending = runList.filter((r) =>
+      ["pending", "running", "awaiting_approval"].includes(r.status)
+    ).length;
+
+    const approvalTimes: number[] = [];
+    for (const run of runList) {
+      const approval = approvalByRun[run.id];
+      if (approval) {
+        const diff =
+          new Date(approval.created_at).getTime() - new Date(run.created_at).getTime();
+        approvalTimes.push(diff / 1000 / 60); // em minutos
+      }
+    }
+    const avgApprovalMinutes =
+      approvalTimes.length > 0
+        ? Math.round(approvalTimes.reduce((a, b) => a + b, 0) / approvalTimes.length)
+        : null;
+
+    const runsByJob: Record<string, number> = {};
+    for (const run of runList) {
+      const name = (run.job as any)?.name ?? run.job_id;
+      runsByJob[name] = (runsByJob[name] ?? 0) + 1;
+    }
+
+    const runsByDay: Record<string, number> = {};
+    for (const run of runList) {
+      const day = run.created_at.slice(0, 10);
+      runsByDay[day] = (runsByDay[day] ?? 0) + 1;
+    }
+
+    const metrics = {
+      period: { start: periodStart.toISOString(), end: periodEnd.toISOString() },
+      totalRuns,
+      approved,
+      rejected,
+      pending,
+      avgApprovalMinutes,
+      runsByJob,
+      runsByDay,
+    };
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { ok: false, error: "ANTHROPIC_API_KEY não configurada" };
+
+    const prompt = `Você é um assistente de operações de tecnologia. Analise as métricas abaixo do Orquestrador HOS (Human-in-the-loop Orchestration System) referentes aos últimos 7 dias e produza um relatório executivo em Markdown.
+
+## Métricas do período
+
+\`\`\`json
+${JSON.stringify(metrics, null, 2)}
+\`\`\`
+
+## Formato esperado
+
+Produza exatamente as 4 seções abaixo, em português, usando Markdown:
+
+# Insights Semanais — Orquestrador HOS
+
+## Highlights
+(principais conquistas e números positivos)
+
+## Problemas Detectados
+(gargalos, atrasos, falhas ou padrões preocupantes)
+
+## Sugestões de Melhoria
+(ações concretas baseadas nos dados)
+
+## Próximos Passos
+(prioridades para a próxima semana)`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return { ok: false, error: `Erro na Claude API: ${err}` };
+    }
+
+    const aiResponse = await response.json();
+    const report_md: string =
+      aiResponse.content?.[0]?.text ?? "Relatório não disponível.";
+
+    const { data: insight, error: insightErr } = await supabase
+      .from("hos_insights")
+      .insert({
+        period_start: periodStart.toISOString(),
+        period_end: periodEnd.toISOString(),
+        report_md,
+        metrics,
+      } as never)
+      .select()
+      .single();
+
+    if (insightErr || !insight) {
+      return { ok: false, error: insightErr?.message ?? "Falha ao salvar insight" };
+    }
+
+    revalidatePath("/orquestrador/insights");
+    return { ok: true, data: insight as HosInsight };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+/**
+ * Retorna os últimos 10 insights ordenados por created_at desc.
+ */
+export async function listInsights(): Promise<HosInsight[]> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from("hos_insights")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("[listInsights] error:", error.message);
+      return [];
+    }
+    return (data ?? []) as HosInsight[];
+  } catch (e) {
+    console.error("[listInsights] exceção:", e);
+    return [];
+  }
+}
+
 /**
  * Simula a criação de um novo job de QA para fins de teste no painel
  */
