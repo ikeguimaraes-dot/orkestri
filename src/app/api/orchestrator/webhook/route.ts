@@ -24,19 +24,8 @@ export async function POST(req: NextRequest) {
   const deployment_url = payload?.url ? `https://${payload.url}` : body.deployment_url
   const triggered_by = 'webhook'
 
-  const slugMap: Record<string, string> = {
-    'deployment.succeeded': 'qa_preview',
-    'deployment.created':   'qa_preview',
-    'deployment.error':     'deploy_prod',
-    'deployment.preview':   'qa_preview',
-    'pr.opened':            'code_review',
-    'deployment.promote':   'deploy_prod',
-  }
-
-  const slug = slugMap[event]
-  if (!slug) {
-    return NextResponse.json({ error: 'Evento não mapeado', event }, { status: 200 })
-  }
+  const target = payload?.target
+  const slug = target === 'production' ? 'deploy_prod' : 'qa_preview'
 
   const { data: job } = await (supabase as any)
     .from('hos_jobs')

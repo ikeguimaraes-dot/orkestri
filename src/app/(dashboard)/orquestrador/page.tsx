@@ -61,6 +61,10 @@ export default async function OrchestratorPage() {
                           </a>
                         ) : run.payload?.pr_number ? (
                           <span>PR #{run.payload.pr_number}</span>
+                        ) : run.payload?.deployment_url ? (
+                          <a href={run.payload.deployment_url} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">
+                            {run.payload.deployment_url}
+                          </a>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
