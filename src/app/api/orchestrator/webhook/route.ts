@@ -1,15 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-
-async function notifyDiscord(message: string) {
-  const url = process.env.DISCORD_WEBHOOK_URL
-  if (!url) return
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: message })
-  })
-}
+import { sendDiscordMessage } from '@/lib/discord/notify'
 
 export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
@@ -54,12 +45,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  await notifyDiscord(
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://kph-os.vercel.app'
+  await sendDiscordMessage(
     `🤖 **Orquestrador HOS** — Nova execução aguardando aprovação\n` +
     `**Job:** ${job.name}\n` +
     `**Evento:** ${event}\n` +
     `**Deploy:** ${deployment_url ?? 'N/A'}\n` +
-    `**Aprovar/Rejeitar:** https://kph-os.vercel.app/orquestrador/${run.id}`
+    `**Run ID:** \`${run.id}\`\n` +
+    `Via Discord: \`/aprovar run_id:${run.id}\` ou \`/rejeitar run_id:${run.id}\`\n` +
+    `**Painel:** ${baseUrl}/orquestrador/${run.id}`
   )
 
   return NextResponse.json({ run_id: run.id, status: 'awaiting_approval' })
