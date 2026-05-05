@@ -496,7 +496,6 @@ export function PontoMensalClient({
     }).catch(() => setLoadingRows(false));
   }, [unitId, selectedPeriodo]);
 
-  // FIX 1 — TextDecoder windows-1252 (superset do ISO-8859-1, padrão Totvs BR)
   const parseFile = useCallback(async (file: File) => {
     setImporting(true);
     setImportMsg(null);
@@ -504,10 +503,18 @@ export function PontoMensalClient({
 
     const buffer = await file.arrayBuffer();
     let text: string;
+    // Auto-detecta encoding: UTF-8 primeiro (fatal:true rejeita sequências inválidas),
+    // cai para Windows-1252 se o arquivo for legado Totvs Latin-1.
     try {
-      text = new TextDecoder("windows-1252").decode(buffer);
+      text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+      // Remove BOM se presente
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
     } catch {
-      text = new TextDecoder("iso-8859-1").decode(buffer);
+      try {
+        text = new TextDecoder("windows-1252").decode(buffer);
+      } catch {
+        text = new TextDecoder("iso-8859-1").decode(buffer);
+      }
     }
 
     const parsed = parsePontoCSV(text);
