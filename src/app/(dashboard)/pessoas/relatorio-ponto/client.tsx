@@ -161,11 +161,13 @@ function dbRowToPontoRow(r: PontoMensalRow): PontoRow {
     abonado_horas: r.abonado_horas ?? "",
     abonado_dias: r.abonado_dias,
     atestado_medico: r.atestado_medico ?? "",
-    regime: r.regime ?? "",
-    demissao: r.demissao ?? "",
-    nascimento: r.nascimento ?? "",
-    filial: r.filial ?? "",
-    is_total: r.is_total,
+    // campos não persistidos — ficam vazios ao ler do banco
+    regime: "",
+    nascimento: "",
+    filial: "",
+    demissao: r.data_demissao ?? "",
+    // totais detectados por matrícula vazia (não há coluna is_total na tabela)
+    is_total: !r.matricula || r.matricula === "",
   };
 }
 
@@ -175,12 +177,9 @@ function pontoRowToInput(r: PontoRow): PontoMensalInput {
     nome: r.nome,
     cpf: r.cpf,
     cargo: r.cargo,
-    data_admissao: r.data_admissao,
-    demissao: r.demissao,
-    nascimento: r.nascimento,
     departamento: r.departamento,
-    filial: r.filial,
-    regime: r.regime,
+    data_admissao: r.data_admissao,
+    data_demissao: r.demissao,
     horas_previstas: r.horas_previstas,
     horas_trabalhadas: r.horas_trabalhadas,
     horas_negativas: r.horas_negativas,
@@ -189,6 +188,7 @@ function pontoRowToInput(r: PontoRow): PontoMensalInput {
     banco_horas_acumulado: r.banco_horas_acumulado,
     banco_horas_mes: r.banco_horas_mes,
     compensacao_bh: r.compensacao_bh,
+    adicional_noturno: r.adicional_noturno,
     falta_injustificada_horas: r.falta_injustificada_horas,
     falta_injustificada_dias: r.falta_injustificada_dias,
     atestado_medico: r.atestado_medico,
@@ -202,12 +202,10 @@ function pontoRowToInput(r: PontoRow): PontoMensalInput {
     ferias_dias: r.ferias_dias,
     licenca_paternidade_horas: r.licenca_paternidade_horas,
     licenca_paternidade_dias: r.licenca_paternidade_dias,
-    adicional_noturno: r.adicional_noturno,
     folga_domingo: r.folga_domingo,
     folga_feriado: r.folga_feriado,
     feriados_dias: r.feriados_dias,
     confraternizacao: r.confraternizacao,
-    is_total: r.is_total,
   };
 }
 

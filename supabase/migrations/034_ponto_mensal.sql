@@ -10,21 +10,20 @@
 CREATE TABLE IF NOT EXISTS ponto_mensal (
   id                         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   unit_id                    UUID        NOT NULL REFERENCES units(id) ON DELETE CASCADE,
-  periodo                    TEXT        NOT NULL,
-  importado_em               TIMESTAMPTZ NOT NULL DEFAULT now(),
-  importado_por              UUID        REFERENCES auth.users(id),
-
-  -- identificação
+  employee_id                UUID        REFERENCES employees(id),
   matricula                  TEXT,
   nome                       TEXT        NOT NULL DEFAULT '',
   cpf                        TEXT,
   cargo                      TEXT,
-  data_admissao              TEXT,
-  demissao                   TEXT,
-  nascimento                 TEXT,
   departamento               TEXT,
-  filial                     TEXT,
-  regime                     TEXT,
+  periodo                    TEXT        NOT NULL,
+  importado_em               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  importado_por              UUID        REFERENCES auth.users(id),
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- datas do colaborador
+  data_admissao              TEXT,
+  data_demissao              TEXT,
 
   -- horas
   horas_previstas            TEXT,
@@ -37,6 +36,9 @@ CREATE TABLE IF NOT EXISTS ponto_mensal (
   banco_horas_acumulado      TEXT,
   banco_horas_mes            TEXT,
   compensacao_bh             TEXT,
+
+  -- extras de jornada
+  adicional_noturno          TEXT,
 
   -- ausências
   falta_injustificada_horas  TEXT,
@@ -53,14 +55,11 @@ CREATE TABLE IF NOT EXISTS ponto_mensal (
   licenca_paternidade_horas  TEXT,
   licenca_paternidade_dias   INTEGER     NOT NULL DEFAULT 0,
 
-  -- extras
-  adicional_noturno          TEXT,
+  -- folgas / feriados
   folga_domingo              TEXT,
   folga_feriado              TEXT,
   feriados_dias              INTEGER     NOT NULL DEFAULT 0,
-  confraternizacao           TEXT,
-
-  is_total                   BOOLEAN     NOT NULL DEFAULT FALSE
+  confraternizacao           TEXT
 );
 
 -- ── Índices ────────────────────────────────────────────────────

@@ -10,12 +10,9 @@ export type PontoMensalInput = {
   nome: string;
   cpf: string;
   cargo: string;
-  data_admissao: string;
-  demissao: string;
-  nascimento: string;
   departamento: string;
-  filial: string;
-  regime: string;
+  data_admissao: string;
+  data_demissao: string;
   horas_previstas: string;
   horas_trabalhadas: string;
   horas_negativas: string;
@@ -24,6 +21,7 @@ export type PontoMensalInput = {
   banco_horas_acumulado: string;
   banco_horas_mes: string;
   compensacao_bh: string;
+  adicional_noturno: string;
   falta_injustificada_horas: string;
   falta_injustificada_dias: number;
   atestado_medico: string;
@@ -37,12 +35,10 @@ export type PontoMensalInput = {
   ferias_dias: number;
   licenca_paternidade_horas: string;
   licenca_paternidade_dias: number;
-  adicional_noturno: string;
   folga_domingo: string;
   folga_feriado: string;
   feriados_dias: number;
   confraternizacao: string;
-  is_total: boolean;
 };
 
 export type PontoMensalRow = PontoMensalInput & {
@@ -127,7 +123,6 @@ export async function getPontoMensal(
       .select("*")
       .eq("unit_id", unitId)
       .eq("periodo", periodo)
-      .order("is_total", { ascending: true })
       .order("nome", { ascending: true });
 
     return (data ?? []) as PontoMensalRow[];
