@@ -513,6 +513,78 @@ export async function getPayslip(id: string): Promise<PayslipWithEmployee | null
   }
 }
 
+export type PayslipFull = {
+  payslip: PayslipWithEmployee;
+  employeeExtra: {
+    cpf: string | null;
+    pis: string | null;
+    data_admissao: string;
+    departamento: string | null;
+  } | null;
+  unit: { name: string; address: string | null } | null;
+  brand: { name: string } | null;
+};
+
+export async function getPayslipFull(id: string): Promise<PayslipFull | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from(PAYSLIPS_TABLE)
+      .select("*, employees!inner(id, nome, sobrenome, funcao, salario_base, unit_id, cpf, pis, data_admissao, departamento)")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const empRaw = (Array.isArray((data as any).employees)
+      ? (data as any).employees[0]
+      : (data as any).employees) as Record<string, any> | null;
+
+    const payslip: PayslipWithEmployee = {
+      ...(data as any),
+      employee: empRaw
+        ? { id: empRaw.id, nome: empRaw.nome, sobrenome: empRaw.sobrenome, funcao: empRaw.funcao, salario_base: empRaw.salario_base }
+        : null,
+    };
+
+    const employeeExtra = empRaw
+      ? { cpf: empRaw.cpf ?? null, pis: empRaw.pis ?? null, data_admissao: empRaw.data_admissao, departamento: empRaw.departamento ?? null }
+      : null;
+
+    let unit: { name: string; address: string | null } | null = null;
+    let brand: { name: string } | null = null;
+
+    if (empRaw?.unit_id) {
+      const { data: unitData } = await supabase
+        .from("units")
+        .select("id, name, address, brand_id")
+        .eq("id", empRaw.unit_id)
+        .maybeSingle();
+
+      if (unitData) {
+        const u = unitData as any;
+        unit = { name: u.name, address: u.address ?? null };
+
+        if (u.brand_id) {
+          const { data: brandData } = await supabase
+            .from("brands")
+            .select("id, name")
+            .eq("id", u.brand_id)
+            .maybeSingle();
+          if (brandData) brand = { name: (brandData as any).name };
+        }
+      }
+    }
+
+    return { payslip, employeeExtra, unit, brand };
+  } catch (e) {
+    console.error("[getPayslipFull] exceção:", e);
+    return null;
+  }
+}
+
 /**
  * Calcula CLT completo (INSS, IRRF, HE, AdN, DSR/gorjeta) e UPSERT no banco.
  * Unique em (employee_id, competencia) garante 1 holerite por mês.

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PayslipDetail } from "@/components/pessoas/PayslipDetail";
-import { getPayslip } from "@/lib/pessoas/actions";
+import { getPayslipFull } from "@/lib/pessoas/actions";
 import { isFounder, requireUser } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +16,16 @@ export default async function PayslipDetailPage({
   const user = await requireUser();
   const { id } = await params;
 
-  const payslip = await getPayslip(id);
-  if (!payslip) notFound();
+  const full = await getPayslipFull(id);
+  if (!full) notFound();
 
-  return <PayslipDetail payslip={payslip} isFounder={isFounder(user)} />;
+  return (
+    <PayslipDetail
+      payslip={full.payslip}
+      isFounder={isFounder(user)}
+      employeeExtra={full.employeeExtra}
+      unit={full.unit}
+      brand={full.brand}
+    />
+  );
 }
