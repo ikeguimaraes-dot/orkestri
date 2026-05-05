@@ -1,73 +1,77 @@
-import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(req: Request) {
-  try {
-    // Basic auth/secret validation
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.HOS_WEBHOOK_SECRET}`) {
-      // Temporarily disable the strict check so we can test without env var, or return 401
-      // return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      console.warn("[Orchestrator Webhook] Sem autorização rigorosa configurada.");
-    }
+async function notifyDiscord(message: string) {
+  const url = process.env.DISCORD_WEBHOOK_URL
+  if (!url) return
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: message })
+  })
+}
 
-    const payload = await req.json();
-    console.log("[Orchestrator Webhook] Recebido payload:", payload);
-
-    // Identificar qual job rodar baseado no payload
-    // Ex: Se o payload vier da Vercel para deployment
-    let jobSlug = "qa_preview";
-    if (payload.type === "deployment_success") {
-      jobSlug = "qa_preview";
-    } else if (payload.action === "opened" && payload.pull_request) {
-      jobSlug = "code_review";
-    }
-
-    const supabase = await createServiceClient();
-    if (!supabase) {
-      return NextResponse.json({ error: "DB Error" }, { status: 500 });
-    }
-
-    // Achar o job correspondente
-    const { data: job, error: jobErr } = await supabase
-      .from("hos_jobs")
-      .select("id")
-      .eq("slug", jobSlug)
-      .maybeSingle();
-
-    if (jobErr || !job) {
-      return NextResponse.json({ error: "Job não encontrado para este evento" }, { status: 400 });
-    }
-
-    // Inserir run na tabela
-    // Num sistema real, aqui chamaríamos a fila do Inngest/Trigger.dev para rodar o script do Playwright.
-    // Por hora, apenas inserimos no BD como `pending` ou `running` e mockamos que o script já rodou.
-    const { data: run, error: runErr } = await supabase
-      .from("hos_runs")
-      .insert({
-        job_id: (job as any).id,
-        status: "awaiting_approval", // Simulando que o script já rodou super rápido e quer aprovação
-        payload: payload,
-        logs: [
-          { time: new Date().toISOString(), message: "Webhook recebido." },
-          { time: new Date().toISOString(), message: `Triggado pelo evento: ${payload.type || "unknown"}` },
-          { time: new Date().toISOString(), message: "Agente processou os dados com sucesso." },
-          { time: new Date().toISOString(), message: "Aguardando verificação humana no painel." }
-        ],
-        result_data: {
-          note: "Agente executado de forma automática via Webhook."
-        }
-      } as never)
-      .select()
-      .single();
-
-    if (runErr) {
-      return NextResponse.json({ error: runErr.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, runId: (run as any)?.id });
-  } catch (error) {
-    console.error("[Orchestrator Webhook] Erro processando request:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+export async function POST(req: NextRequest) {
+  const supabase = createServiceClient()
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase indisponível' }, { status: 500 })
   }
+
+  const body = await req.json()
+  const { type, payload } = body
+
+  const event = type ?? body.event
+  const deployment_url = payload?.url ? `https://${payload.url}` : body.deployment_url
+  const triggered_by = 'webhook'
+
+  const slugMap: Record<string, string> = {
+    'deployment.succeeded': 'qa_preview',
+    'deployment.created':   'qa_preview',
+    'deployment.error':     'deploy_prod',
+    'deployment.preview':   'qa_preview',
+    'pr.opened':            'code_review',
+    'deployment.promote':   'deploy_prod',
+  }
+
+  const slug = slugMap[event]
+  if (!slug) {
+    return NextResponse.json({ error: 'Evento não mapeado', event }, { status: 200 })
+  }
+
+  const { data: job } = await (supabase as any)
+    .from('hos_jobs')
+    .select('id, name')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .single()
+
+  if (!job) {
+    return NextResponse.json({ error: 'Job não encontrado' }, { status: 404 })
+  }
+
+  const { data: run, error } = await (supabase as any)
+    .from('hos_runs')
+    .insert({
+      job_id: job.id,
+      status: 'awaiting_approval',
+      triggered_by,
+      payload: { deployment_url, event, raw: payload ?? {} },
+      logs: [{ ts: new Date().toISOString(), msg: `Run criado via ${triggered_by} — evento: ${event}` }]
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  await notifyDiscord(
+    `🤖 **Orquestrador HOS** — Nova execução aguardando aprovação\n` +
+    `**Job:** ${job.name}\n` +
+    `**Evento:** ${event}\n` +
+    `**Deploy:** ${deployment_url ?? 'N/A'}\n` +
+    `**Aprovar/Rejeitar:** https://kph-os.vercel.app/orquestrador/${run.id}`
+  )
+
+  return NextResponse.json({ run_id: run.id, status: 'awaiting_approval' })
 }
