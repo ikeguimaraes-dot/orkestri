@@ -110,7 +110,22 @@ export async function submitRunDecision(
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { ok: false, error: "Supabase indisponível" };
 
-    // 1. Grava no histórico de aprovações
+    // 1. Idempotência: verificar que o run ainda está awaiting_approval
+    const { data: run, error: runFetchErr } = await supabase
+      .from("hos_runs")
+      .select("status")
+      .eq("id", runId)
+      .single();
+
+    if (runFetchErr || !run) {
+      return { ok: false, error: "Run não encontrado" };
+    }
+
+    if ((run as any).status !== "awaiting_approval") {
+      return { ok: false, error: `Run já foi processado (status atual: ${(run as any).status})` };
+    }
+
+    // 2. Grava no histórico de aprovações
     const { data: approvalData, error: approvalErr } = await supabase
       .from("hos_approvals")
       .insert({
@@ -126,19 +141,22 @@ export async function submitRunDecision(
       return { ok: false, error: approvalErr?.message ?? "Falha ao gravar decisão" };
     }
 
-    // 2. Atualiza o status do run
+    // 3. Atualiza o status do run — usa .select().single() para detectar bloqueio silencioso de RLS
     const newStatus: HosRunStatus = decision === "approve" ? "approved" : "rejected";
-    const { error: runErr } = await supabase
+    const { data: updatedRun, error: runErr } = await supabase
       .from("hos_runs")
       .update({ status: newStatus } as never)
-      .eq("id", runId);
+      .eq("id", runId)
+      .select("id, status")
+      .single();
 
     if (runErr) {
-      // Falhou em atualizar o status, mas já registrou aprovação. Idealmente isso estaria numa RPC/transaction.
-      console.error("[submitRunDecision] Falha ao atualizar status do run:", runErr.message);
+      return { ok: false, error: `Falha ao atualizar status do run: ${runErr.message}` };
     }
 
-    // [OPCIONAL] Se 'approve' e o job for de Vercel Preview, você pode disparar aqui o webhook para a Vercel promover a branch.
+    if (!updatedRun) {
+      return { ok: false, error: "Permissão negada ao atualizar status do run (verifique policy de UPDATE em hos_runs)" };
+    }
 
     revalidatePath("/orquestrador");
     revalidatePath(`/orquestrador/${runId}`);

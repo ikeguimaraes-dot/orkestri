@@ -9,7 +9,8 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
     'use server'
     const feedback = formData.get('feedback') as string
     const id = formData.get('run_id') as string
-    await submitRunDecision(id, 'approve', feedback)
+    const result = await submitRunDecision(id, 'approve', feedback)
+    if (!result.ok) throw new Error(result.error)
     redirect('/orquestrador')
   }
 
@@ -17,7 +18,8 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
     'use server'
     const feedback = formData.get('feedback') as string
     const id = formData.get('run_id') as string
-    await submitRunDecision(id, 'reject', feedback)
+    const result = await submitRunDecision(id, 'reject', feedback)
+    if (!result.ok) throw new Error(result.error)
     redirect('/orquestrador')
   }
 

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return new Response('Server misconfigured', { status: 500 })
   }
 
-  const valid = verifyDiscordSignature(publicKey, signature, timestamp, rawBody)
+  const valid = await verifyDiscordSignature(publicKey, signature, timestamp, rawBody)
   console.log('[discord/interactions] resultado da verificação:', valid)
   if (!valid) {
     return new Response('Invalid request signature', { status: 401 })
