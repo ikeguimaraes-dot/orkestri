@@ -206,114 +206,39 @@ export default function GorjetasPage() {
     setImportLog(['🔄 Lendo arquivo...'])
 
     try {
-      const buf = await file.arrayBuffer()
-      const wb  = XLSX.read(buf, { type: 'array', cellDates: true })
-      const log: string[] = ['🔄 Lendo arquivo...']
-
-      // ── Aba VALORES ────────────────────────────────────────────────────────
-      const wsName = wb.SheetNames.find(n => n.toUpperCase().includes('VALOR')) ?? wb.SheetNames[0]!
+      const buf    = await file.arrayBuffer()
+      const wb     = XLSX.read(buf, { type: 'array' })
+      const wsName = wb.SheetNames[0]!
       const ws     = wb.Sheets[wsName]!
       const rows   = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null })
 
-      log.push(`📋 Aba "${wsName}" · ${rows.length} linhas · Abas: ${wb.SheetNames.join(', ')}`)
-      setImportLog([...log])
+      type Row = (string | number | null)[]
 
-      // ── Diagnóstico: primeiras 5 linhas (col 0–9 com índice) ──────────────
-      type Row = (string | number | Date | null)[]
-      const preview = rows.slice(0, 5).map((rawRow, i) => {
-        const cells = (rawRow as Row).slice(0, 10).map((c, ci) => {
-          let v = '∅'
-          if (c !== null && c !== undefined)
-            v = c instanceof Date ? c.toISOString().slice(0, 10) : String(c).slice(0, 16)
-          return `[${ci}]${v}`
-        })
-        return `L${i + 1}: ${cells.join(' ')}`
-      })
-      console.log('=== Estrutura da planilha (5 primeiras linhas) ===')
-      preview.forEach(l => console.log(l))
-      log.push('🔍 Estrutura (5 primeiras linhas):')
-      preview.forEach(l => log.push(`  ${l}`))
-      setImportLog([...log])
+      // Estrutura confirmada:
+      // Row onde col 1 contém "EQUIPE"        → col 2+ = datas ISO (YYYY-MM-DD)
+      // Row onde col 1 contém "VALOR TOTAL PO" → col 2+ = receita bruta por dia
+      let rowDatas:    Row | null = null
+      let rowReceitas: Row | null = null
 
-      // ── Helper: qualquer valor de célula → YYYY-MM-DD ─────────────────────
-      function toDateStr(v: string | number | Date | null): string | null {
-        if (v === null || v === undefined) return null
-        if (v instanceof Date) return v.toISOString().slice(0, 10)
-        if (typeof v === 'string') {
-          const m = v.match(/(\d{4})-(\d{2})-(\d{2})/)
-          return m ? `${m[1]!}-${m[2]!}-${m[3]!}` : null
-        }
-        if (typeof v === 'number') {
-          try {
-            const d = (XLSX.SSF as any).parse_date_code(v) as { y: number; m: number; d: number }
-            return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
-          } catch { return null }
-        }
-        return null
-      }
-
-      // ── Parser: label em col 1, datas/valores em col 2+ ───────────────────
-      // L1: col 1 = "EQUIPE"           → col 2+ = datas ISO (cabeçalho de colunas)
-      // L2: col 1 = "VALOR TOTAL PO…"  → col 2+ = receita bruta por dia
-      // L3: col 1 = "IMPOSTOS"         → ignorado
-      // L4: col 1 = "VALOR TOTAL LÍ…"  → ignorado (líquido derivado)
-      const EQUIPE_KW  = ['EQUIPE']
-      const RECEITA_KW = ['VALOR TOTAL PO', 'RECEITA BRUTA', 'BRUTO', 'VALOR TOTAL']
-      const PONTOS_KW  = ['TOTAL DE PONTOS', 'TOTAL PONTOS', 'PONTOS']
-      const SKIP_KW    = ['IMPOSTO', 'RETENÇ', 'RETENC', 'LÍQUIDO', 'LIQUIDO', 'VALOR TOTAL LÍ']
-
-      let equipRow:   Row | null = null
-      let receitaRow: Row | null = null
-      let pontosRow:  Row | null = null
-
-      for (const rawRow of rows) {
-        const r  = rawRow as Row
+      for (const raw of rows) {
+        const r  = raw as Row
         const c1 = String(r[1] ?? '').trim().toUpperCase()
-        if (!c1) continue
-        if (SKIP_KW.some(k => c1.includes(k)))                              continue
-        if (!equipRow   && EQUIPE_KW.some(k =>  c1.includes(k))) { equipRow   = r; continue }
-        if (!receitaRow && RECEITA_KW.some(k => c1.includes(k))) { receitaRow = r; continue }
-        if (!pontosRow  && PONTOS_KW.some(k =>  c1.includes(k))) { pontosRow  = r; continue }
+        if (!rowDatas    && c1.includes('EQUIPE'))         { rowDatas    = r; continue }
+        if (!rowReceitas && c1.includes('VALOR TOTAL PO')) { rowReceitas = r; continue }
+        if (rowDatas && rowReceitas) break
       }
 
-      if (!receitaRow) {
-        const labels = rows
-          .slice(0, 20)
-          .map(r => String((r as Row)[1] ?? '').trim())
-          .filter(Boolean)
-          .join(' | ')
-        throw new Error(`Linha de receita não encontrada. Labels da coluna B: ${labels}`)
-      }
+      if (!rowDatas)    throw new Error('Linha EQUIPE (datas) não encontrada na planilha')
+      if (!rowReceitas) throw new Error('Linha VALOR TOTAL PO (receitas) não encontrada na planilha')
 
-      log.push(`✅ Linha receita: "${String(receitaRow[1])}"`)
-      log.push(equipRow
-        ? `✅ Linha datas:   "${String(equipRow[1])}"`
-        : `ℹ️  Linha EQUIPE não encontrada — datas inferidas do período selecionado`)
-      log.push(pontosRow
-        ? `✅ Linha pontos:  "${String(pontosRow[1])}"`
-        : `ℹ️  Linha de pontos não encontrada — total_pontos=1 (placeholder)`)
-      setImportLog([...log])
-
-      // ── Construir períodos: col 2+ = um dia cada ───────────────────────────
       const periodoRows: Record<string, unknown>[] = []
 
-      for (let col = 2; col < receitaRow.length; col++) {
-        const data = equipRow
-          ? toDateStr(equipRow[col] ?? null)
-          : `${periodo.ano}-${String(periodo.mes).padStart(2, '0')}-${String(col - 1).padStart(2, '0')}`
-
-        if (!data) continue
-
-        const receita_bruta = Number(receitaRow[col] ?? 0)
-        if (isNaN(receita_bruta) || receita_bruta <= 0) continue
-
-        const total_pontos = pontosRow ? (Number(pontosRow[col] ?? 0) || 1) : 1
-
-        periodoRows.push({ unit_id: unitId, data, receita_bruta, total_pontos, fonte: 'import' })
+      for (let col = 2; col < rowDatas.length; col++) {
+        const data         = String(rowDatas[col] ?? '').trim()
+        const receita_bruta = Number(rowReceitas[col])
+        if (!data || isNaN(receita_bruta) || receita_bruta <= 0) continue
+        periodoRows.push({ unit_id: unitId, data, receita_bruta, total_pontos: 1, fonte: 'import' })
       }
-
-      log.push(`📊 ${periodoRows.length} dias com receita detectados`)
-      setImportLog([...log])
 
       if (!periodoRows.length) throw new Error('Nenhum dia de receita válido encontrado')
 
@@ -322,9 +247,7 @@ export default function GorjetasPage() {
         .upsert(periodoRows, { onConflict: 'unit_id,data' })
 
       if (pErr) throw new Error(`Erro ao salvar períodos: ${pErr.message}`)
-      log.push(`✅ ${periodoRows.length} períodos salvos`)
-      log.push(`🎉 Importação concluída!`)
-      setImportLog([...log])
+      setImportLog(prev => [...prev, `✅ ${periodoRows.length} períodos salvos no banco`, '🎉 Importação concluída!'])
       load()
     } catch (err: unknown) {
       setImportLog(prev => [...prev, `❌ Erro: ${err instanceof Error ? err.message : String(err)}`])
