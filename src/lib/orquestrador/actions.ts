@@ -1,6 +1,6 @@
 "use server"
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createServiceClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/server";
 import type { ActionResult } from "@/lib/result";
 
@@ -144,6 +144,57 @@ export async function submitRunDecision(
     revalidatePath(`/orquestrador/${runId}`);
 
     return { ok: true, data: approvalData as HosApproval };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
+  }
+}
+
+// ── Discord Decision ───────────────────────────────────────────────
+
+/**
+ * Aprova ou rejeita um run a partir do Discord (sem sessão de usuário).
+ * Usa service client. Não cria entrada em hos_approvals (user_id FK),
+ * em vez disso registra a decisão nos logs do run.
+ */
+export async function submitRunDecisionFromDiscord(
+  runId: string,
+  decision: "approve" | "reject",
+  discordUser: string
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = createServiceClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+
+    const { data: run } = await (supabase as any)
+      .from("hos_runs")
+      .select("status, logs")
+      .eq("id", runId)
+      .single();
+
+    if (!run) return { ok: false, error: "Run não encontrado" };
+    if ((run as any).status !== "awaiting_approval") {
+      return { ok: false, error: `Run não está aguardando aprovação (status atual: ${(run as any).status})` };
+    }
+
+    const newStatus: HosRunStatus = decision === "approve" ? "approved" : "rejected";
+    const logs = [
+      ...(((run as any).logs ?? []) as any[]),
+      {
+        ts: new Date().toISOString(),
+        msg: `Decisão via Discord por @${discordUser}: ${newStatus}`,
+      },
+    ];
+
+    const { error } = await (supabase as any)
+      .from("hos_runs")
+      .update({ status: newStatus, logs })
+      .eq("id", runId);
+
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/orquestrador");
+    revalidatePath(`/orquestrador/${runId}`);
+    return { ok: true, data: undefined };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro inesperado" };
   }
