@@ -66,6 +66,9 @@ export default function GorjetasPage() {
   const { unit, units, setUnit } = useUnit()
   const unitId  = unit?.id ?? null
 
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const [tab, setTab] = useState<'resumo' | 'dias' | 'cargos' | 'importar'>('resumo')
   const [periodo, setPeriodo] = useState<Periodo>(() => {
     const d = new Date()
@@ -326,6 +329,7 @@ export default function GorjetasPage() {
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!mounted) return null
   return (
     <div className="p-6 space-y-6">
 
