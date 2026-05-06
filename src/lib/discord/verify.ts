@@ -1,32 +1,22 @@
-function hexToBuffer(hex: string): ArrayBuffer {
-  const bytes = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
-  }
-  return bytes.buffer as ArrayBuffer
-}
+import { verify as cryptoVerify, createPublicKey } from 'node:crypto'
 
-export async function verifyDiscordSignature(
+// DER prefix para SubjectPublicKeyInfo de Ed25519 (OID 1.3.101.112)
+const ED25519_SPKI_HEADER = Buffer.from('302a300506032b6570032100', 'hex')
+
+export function verifyDiscordSignature(
   publicKey: string,
   signature: string,
   timestamp: string,
   rawBody: string
-): Promise<boolean> {
+): boolean {
   try {
-    const key = await crypto.subtle.importKey(
-      'raw',
-      hexToBuffer(publicKey),
-      { name: 'Ed25519' },
-      false,
-      ['verify']
-    )
-    return await crypto.subtle.verify(
-      'Ed25519',
-      key,
-      hexToBuffer(signature),
-      new TextEncoder().encode(timestamp + rawBody)
-    )
-  } catch {
+    const pubKeyDer = Buffer.concat([ED25519_SPKI_HEADER, Buffer.from(publicKey, 'hex')])
+    const key = createPublicKey({ key: pubKeyDer, format: 'der', type: 'spki' })
+    const message = Buffer.from(timestamp + rawBody)
+    const sig = Buffer.from(signature, 'hex')
+    return cryptoVerify(null, message, key, sig)
+  } catch (e) {
+    console.error('[verifyDiscordSignature]', e)
     return false
   }
 }
