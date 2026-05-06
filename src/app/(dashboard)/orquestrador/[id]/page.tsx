@@ -1,4 +1,5 @@
 import { getRunDetails, submitRunDecision } from '@/lib/orquestrador/actions'
+import type { HosApproval } from '@/lib/orquestrador/actions'
 import { redirect } from 'next/navigation'
 
 function isNextError(e: unknown): boolean {
@@ -35,31 +36,43 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
     const run = await getRunDetails(runId)
     if (!run) redirect('/orquestrador')
 
-    const logs = (run.logs ?? []) as Array<{ ts: string; msg: string }>
-    const approvals = ((run as unknown as Record<string, unknown>).hos_approvals ?? []) as Array<{ decision: string; feedback?: string; created_at: string }>
+    // Guards: logs pode vir como null do DB ou ter shape diferente (mockCreateRun usa time/message)
+    const rawLogs = Array.isArray(run.logs) ? (run.logs as Array<Record<string, unknown>>) : []
+    const logs = rawLogs.map((log) => ({
+      ts: String(log.ts ?? log.time ?? ''),
+      msg: String(log.msg ?? log.message ?? ''),
+    }))
+
+    const approvals: HosApproval[] = Array.isArray(run.hos_approvals) ? run.hos_approvals : []
 
     return (
       <div className="p-6 max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">{(run.job as any)?.name}</h1>
+          <h1 className="text-2xl font-bold">{run.job?.name ?? '—'}</h1>
           <p className="text-sm text-gray-400 mt-1">
-            {new Date(run.created_at).toLocaleString('pt-BR')} · via {(run as any).triggered_by ?? '—'} · status: <strong>{run.status}</strong>
+            {run.created_at ? new Date(run.created_at).toLocaleString('pt-BR') : '—'} · via {(run as any).triggered_by ?? '—'} · status: <strong>{run.status}</strong>
           </p>
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4">
           <h2 className="text-sm font-semibold mb-2 text-gray-600">Payload</h2>
-          <pre className="text-xs text-gray-700 overflow-auto">{JSON.stringify(run.payload, null, 2)}</pre>
+          <pre className="text-xs text-gray-700 overflow-auto">
+            {run.payload != null ? JSON.stringify(run.payload, null, 2) : '—'}
+          </pre>
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4">
           <h2 className="text-sm font-semibold mb-2 text-gray-600">Logs do Agente</h2>
           <div className="space-y-1">
-            {logs.map((log, i) => (
-              <p key={i} className="text-xs font-mono text-gray-700">
-                <span className="text-gray-400">[{log.ts}]</span> {log.msg}
-              </p>
-            ))}
+            {logs.length === 0 ? (
+              <p className="text-xs text-gray-400">Sem logs registrados.</p>
+            ) : (
+              logs.map((log, i) => (
+                <p key={i} className="text-xs font-mono text-gray-700">
+                  {log.ts && <span className="text-gray-400">[{log.ts}]</span>} {log.msg}
+                </p>
+              ))
+            )}
           </div>
         </div>
 

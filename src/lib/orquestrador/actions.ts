@@ -30,7 +30,8 @@ export type HosRun = {
 };
 
 export type HosRunWithJob = HosRun & {
-  job: HosJob;
+  job: HosJob | null;
+  hos_approvals?: HosApproval[];
 };
 
 export type HosApproval = {
@@ -80,7 +81,7 @@ export async function getRunDetails(id: string): Promise<HosRunWithJob | null> {
 
     const { data, error } = await supabase
       .from("hos_runs")
-      .select("*, job:hos_jobs(*)")
+      .select("*, job:hos_jobs(*), hos_approvals(*)")
       .eq("id", id)
       .maybeSingle();
 
