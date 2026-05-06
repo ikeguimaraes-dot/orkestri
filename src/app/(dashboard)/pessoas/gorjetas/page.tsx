@@ -341,6 +341,7 @@ export default function GorjetasPage() {
             onChange={e => setUnitId(e.target.value)}
             className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           >
+            {!unitId && <option value="" disabled>Carregando…</option>}
             {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
           <select

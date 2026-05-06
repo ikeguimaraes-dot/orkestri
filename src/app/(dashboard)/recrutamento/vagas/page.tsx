@@ -440,7 +440,8 @@ export default function VagasPage() {
                   onChange={e => setUnitFiltro(e.target.value)}
                   className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  <option value="todos">Todas as unidades</option>
+                  {!units.length && <option value="todos" disabled>Carregando…</option>}
+                <option value="todos">Todas as unidades</option>
                   {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
 
