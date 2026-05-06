@@ -14,14 +14,23 @@ export function verifyDiscordSignature(
       console.error('[verifyDiscordSignature] parâmetro ausente — signature:', !!signature, 'timestamp:', !!timestamp, 'publicKey:', !!publicKey)
       return false
     }
+    console.log('[verifyDiscordSignature] publicKey hex:', publicKey)
+    console.log('[verifyDiscordSignature] signature hex:', signature)
+
     const pubKeyDer = Buffer.concat([ED25519_SPKI_HEADER, Buffer.from(publicKey, 'hex')])
     const key = createPublicKey({ key: pubKeyDer, format: 'der', type: 'spki' })
     const message = Buffer.from(timestamp + rawBody)
     const sig = Buffer.from(signature, 'hex')
-    console.log('[verifyDiscordSignature] message byte length:', message.length, '| sig byte length:', sig.length, '| publicKey hex length:', publicKey.length)
-    return cryptoVerify(null, message, key, sig)
+
+    console.log('[verifyDiscordSignature] message hex:', message.toString('hex'))
+    console.log('[verifyDiscordSignature] message byte length:', message.length, '| sig byte length:', sig.length)
+
+    const result = cryptoVerify(null, message, key, sig)
+    console.log('[verifyDiscordSignature] cryptoVerify result:', result)
+    return result
   } catch (e) {
-    console.error('[verifyDiscordSignature] erro:', e)
+    console.error('[verifyDiscordSignature] erro ao verificar:', (e as Error)?.message ?? e)
+    console.error('[verifyDiscordSignature] stack:', (e as Error)?.stack)
     return false
   }
 }
