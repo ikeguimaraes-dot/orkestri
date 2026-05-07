@@ -46,10 +46,6 @@ export type HosApproval = {
 
 // ── Actions ────────────────────────────────────────────────────────
 
-/**
- * Retorna todos os runs pendentes, em andamento ou aguardando aprovação.
- * E os últimos runs finalizados (aprovado/rejeitado/falho) num limite.
- */
 export async function listOrchestratorRuns(): Promise<HosRunWithJob[]> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -73,9 +69,6 @@ export async function listOrchestratorRuns(): Promise<HosRunWithJob[]> {
   }
 }
 
-/**
- * Busca os detalhes de uma execução específica.
- */
 export async function getRunDetails(id: string): Promise<HosRunWithJob | null> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -98,9 +91,6 @@ export async function getRunDetails(id: string): Promise<HosRunWithJob | null> {
   }
 }
 
-/**
- * Human-in-the-loop: Aprova ou rejeita uma execução que está aguardando.
- */
 export async function submitRunDecision(
   runId: string,
   decision: "approve" | "reject",
@@ -172,11 +162,6 @@ export async function submitRunDecision(
 
 // ── Discord Decision ───────────────────────────────────────────────
 
-/**
- * Aprova ou rejeita um run a partir do Discord (sem sessão de usuário).
- * Usa service client. Não cria entrada em hos_approvals (user_id FK),
- * em vez disso registra a decisão nos logs do run.
- */
 export async function submitRunDecisionFromDiscord(
   runId: string,
   decision: "approve" | "reject",
@@ -234,10 +219,6 @@ export type HosInsight = {
 
 // ── Insight Actions ────────────────────────────────────────────────
 
-/**
- * Busca runs e aprovações dos últimos 7 dias, monta métricas,
- * chama a Claude API e salva o relatório em hos_insights.
- */
 export async function generateWeeklyInsight(): Promise<ActionResult<HosInsight>> {
   try {
     const user = await requireUser();
@@ -383,9 +364,6 @@ Produza exatamente as 4 seções abaixo, em português, usando Markdown:
   }
 }
 
-/**
- * Retorna os últimos 10 insights ordenados por created_at desc.
- */
 export async function listInsights(): Promise<HosInsight[]> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -408,9 +386,6 @@ export async function listInsights(): Promise<HosInsight[]> {
   }
 }
 
-/**
- * Simula a criação de um novo job de QA para fins de teste no painel
- */
 export async function mockCreateRun(jobSlug: string): Promise<ActionResult<HosRun>> {
   try {
     const supabase = await createSupabaseServerClient();
