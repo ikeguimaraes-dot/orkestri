@@ -99,8 +99,9 @@ function isNextInternal(e: unknown): boolean {
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (user) return user;
+  // UUID fixo seedado em 039_seed_bypass_user.sql — satisfaz FK auth.users(id).
   return {
-    id: "bypass",
+    id: "00000000-0000-0000-0000-000000000001",
     email: "bypass@kph.os",
     roles: [{ role: "founder" as RoleName, unitId: null, brandId: null, groupId: null }],
   };
