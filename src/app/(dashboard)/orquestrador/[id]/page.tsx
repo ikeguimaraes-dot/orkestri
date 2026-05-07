@@ -113,6 +113,7 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
     )
   } catch (e: unknown) {
     if (isNextError(e)) throw e
+    console.error('[orquestrador-detail-error]', e)
     const msg = e instanceof Error ? e.message : String(e)
     const stack = e instanceof Error ? (e.stack ?? '') : ''
     return (
