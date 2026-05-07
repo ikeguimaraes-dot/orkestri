@@ -2,6 +2,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { sendDiscordMessage } from '@/lib/discord/notify'
 
+const ALLOWED_PROJECTS = (process.env.ORCHESTRATOR_ALLOWED_PROJECTS || 'kph-os')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+
 export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   if (!supabase) {
@@ -10,6 +15,12 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { type, payload } = body
+
+  const projectName = body?.payload?.name || body?.payload?.project?.name
+  if (projectName && !ALLOWED_PROJECTS.includes(projectName)) {
+    console.log(`[orchestrator] Webhook ignorado, projeto fora do allowlist: ${projectName}`)
+    return Response.json({ ignored: true, project: projectName }, { status: 200 })
+  }
 
   const event = type ?? body.event
   const deployment_url = payload?.url ? `https://${payload.url}` : body.deployment_url
