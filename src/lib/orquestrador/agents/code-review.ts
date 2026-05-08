@@ -17,12 +17,6 @@ export async function executeCodeReview(runId: string, payload: any): Promise<vo
         },
       }
     )
-    console.log('[code-review] diff fetch status:', diffRes.status)
-    console.log('[code-review] diff fetch headers:', Object.fromEntries(diffRes.headers.entries()))
-    if (!diffRes.ok) {
-      const errBody = await diffRes.text()
-      console.error('[code-review] diff fetch error body:', errBody)
-    }
     let diff = await diffRes.text()
     if (diff.length > MAX_DIFF_BYTES) {
       diff = diff.slice(0, MAX_DIFF_BYTES) + '\n\n[diff truncado — muito extenso]'
