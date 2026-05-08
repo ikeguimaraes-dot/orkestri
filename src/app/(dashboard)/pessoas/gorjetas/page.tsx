@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useUnit, useSupabase } from '@/lib/auth/context'
 import * as XLSX from 'xlsx'
-import { upsertGorjetaPeriodos } from './actions'
+import { upsertGorjetaPeriodos, fetchGorjetasDados } from './actions'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -94,19 +94,7 @@ export default function GorjetasPage() {
     const inicio = `${periodo.ano}-${String(periodo.mes).padStart(2, '0')}-01`
     const fim    = new Date(periodo.ano, periodo.mes, 0).toISOString().slice(0, 10)
 
-    const [{ data: pData }, { data: dData }] = await Promise.all([
-      sb.from('gorjeta_periodos')
-        .select('data,receita_bruta,receita_liquida,total_pontos,valor_ponto,fonte')
-        .eq('unit_id', unitId)
-        .gte('data', inicio)
-        .lte('data', fim)
-        .order('data'),
-      sb.from('gorjeta_dias')
-        .select('employee_id,data,cargo,pontos,valor_calculado,presente,employees(nome)')
-        .eq('unit_id', unitId)
-        .gte('data', inicio)
-        .lte('data', fim),
-    ])
+    const { periodos: pData, dias: dData } = await fetchGorjetasDados(unitId, inicio, fim)
 
     setDias((pData as DiaReceita[]) ?? [])
 
