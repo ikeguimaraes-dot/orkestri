@@ -1,0 +1,49 @@
+name: QA Playwright — Preview
+
+on:
+  deployment_status:
+
+jobs:
+  qa:
+    if: >
+      github.event.deployment_status.state == 'success' &&
+      contains(github.event.deployment_status.environment, 'Preview')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instala dependências
+        run: npm ci
+
+      - name: Instala Playwright + Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Roda smoke tests
+        env:
+          PREVIEW_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          npx playwright test tests/smoke.spec.ts --reporter=json \
+            > test-results.json 2>&1 || true
+
+          if [ ! -s test-results.json ]; then
+            echo '{"stats":{"expected":0,"unexpected":4},"errors":["runner crashed"]}' > test-results.json
+          fi
+
+      - name: Envia resultados ao Orquestrador
+        if: always()
+        env:
+          QA_CALLBACK_SECRET: ${{ secrets.QA_CALLBACK_SECRET }}
+          PREVIEW_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          RESULTS=$(cat test-results.json 2>/dev/null || echo '{"stats":{"expected":0,"unexpected":4}}')
+          curl -s -X POST https://kph-os.vercel.app/api/orchestrator/qa-callback \
+            -H "Content-Type: application/json" \
+            -H "x-qa-secret: $QA_CALLBACK_SECRET" \
+            -d "{\"preview_url\": \"$PREVIEW_URL\", \"results\": $RESULTS}"
