@@ -225,6 +225,66 @@ export async function autoApproveRun(runId: string): Promise<void> {
     .eq('id', runId)
 }
 
+// ── Run Helpers (usados por agentes server-side) ───────────────────
+
+export async function createRun(
+  jobSlug: string,
+  payload: Record<string, unknown>
+): Promise<{ id: string }> {
+  const supabase = createServiceClient()
+  if (!supabase) throw new Error('Supabase indisponível')
+
+  const { data: job } = await (supabase as any)
+    .from('hos_jobs')
+    .select('id')
+    .eq('slug', jobSlug)
+    .eq('is_active', true)
+    .single()
+
+  if (!job) throw new Error(`Job não encontrado: ${jobSlug}`)
+
+  const { data: run, error } = await (supabase as any)
+    .from('hos_runs')
+    .insert({
+      job_id: job.id,
+      status: 'running',
+      triggered_by: 'webhook',
+      payload,
+      logs: [{ ts: new Date().toISOString(), msg: `Run criado para job: ${jobSlug}` }],
+    })
+    .select('id')
+    .single()
+
+  if (error || !run) throw new Error(error?.message ?? 'Falha ao criar run')
+  return run as { id: string }
+}
+
+export async function updateRunLogs(
+  runId: string,
+  resultData: Record<string, unknown>
+): Promise<void> {
+  const supabase = createServiceClient()
+  if (!supabase) return
+
+  await (supabase as any)
+    .from('hos_runs')
+    .update({ result_data: resultData })
+    .eq('id', runId)
+}
+
+export async function markRunFailed(runId: string, reason: string): Promise<void> {
+  const supabase = createServiceClient()
+  if (!supabase) return
+
+  await (supabase as any)
+    .from('hos_runs')
+    .update({
+      status: 'failed',
+      result_data: { error: reason, failed_at: new Date().toISOString() },
+    })
+    .eq('id', runId)
+}
+
 // ── Insight Types ──────────────────────────────────────────────────
 
 export type HosInsight = {
