@@ -206,6 +206,25 @@ export async function submitRunDecisionFromDiscord(
   }
 }
 
+// ── Auto-Approval ──────────────────────────────────────────────────
+
+export async function autoApproveRun(runId: string): Promise<void> {
+  const supabase = createServiceClient()
+  if (!supabase) return
+
+  await (supabase as any).from('hos_approvals').insert({
+    run_id: runId,
+    user_id: '00000000-0000-0000-0000-000000000001',
+    decision: 'approve',
+    feedback: 'Auto-aprovado pelo sistema — job de baixo risco',
+  })
+
+  await (supabase as any)
+    .from('hos_runs')
+    .update({ status: 'approved' })
+    .eq('id', runId)
+}
+
 // ── Insight Types ──────────────────────────────────────────────────
 
 export type HosInsight = {

@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { sendDiscordMessage } from '@/lib/discord/notify'
+import { autoApproveRun } from '@/lib/orquestrador/actions'
 
 const ALLOWED_PROJECTS = (process.env.ORCHESTRATOR_ALLOWED_PROJECTS || 'kph-os')
   .split(',')
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const { data: job } = await (supabase as any)
     .from('hos_jobs')
-    .select('id, name')
+    .select('id, name, auto_approve')
     .eq('slug', slug)
     .eq('is_active', true)
     .single()
@@ -57,6 +58,18 @@ export async function POST(req: NextRequest) {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://kph-os.vercel.app'
+
+  if (job.auto_approve) {
+    await autoApproveRun(run.id)
+    await sendDiscordMessage(
+      `✅ **Auto-aprovado** — ${job.name}\n` +
+      `**Deploy:** ${deployment_url ?? 'N/A'}\n` +
+      `Job de baixo risco — nenhuma ação necessária.\n` +
+      `**Painel:** ${baseUrl}/orquestrador/${run.id}`
+    )
+    return NextResponse.json({ run_id: run.id, status: 'approved' })
+  }
+
   await sendDiscordMessage(
     `🤖 **Orquestrador HOS** — Nova execução aguardando aprovação\n` +
     `**Job:** ${job.name}\n` +
