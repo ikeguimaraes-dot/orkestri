@@ -2,6 +2,18 @@ import { NextRequest } from 'next/server'
 
 const COMMANDS = [
   {
+    name: 'hos',
+    description: 'Consulta o Orquestrador HOS em linguagem natural',
+    options: [
+      {
+        name: 'pergunta',
+        description: 'O que você quer saber? Ex: status dos runs, pendentes, jobs ativos...',
+        type: 3,
+        required: true,
+      },
+    ],
+  },
+  {
     name: 'aprovar',
     description: 'Aprovar uma execução no Orquestrador HOS',
     options: [

@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
+import { after } from 'next/server'
 import { verifyDiscordSignature } from '@/lib/discord/verify'
 import { submitRunDecisionFromDiscord } from '@/lib/orquestrador/actions'
+import { executeCommander } from '@/lib/orquestrador/commander'
 
 // Discord interaction types
 const PING = 1
@@ -53,6 +55,15 @@ export async function POST(req: NextRequest) {
     const runId: string = body.data?.options?.find((o: any) => o.name === 'run_id')?.value ?? ''
     const discordUser: string =
       body.member?.user?.username ?? body.user?.username ?? 'unknown'
+
+    if (commandName === 'hos') {
+      const pergunta = body.data?.options?.find((o: any) => o.name === 'pergunta')?.value ?? 'Olá'
+      const token = body.token
+      after(async () => {
+        await executeCommander(pergunta, token)
+      })
+      return Response.json({ type: 5 }) // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+    }
 
     if (!['aprovar', 'rejeitar'].includes(commandName)) {
       return json({ type: CHANNEL_MESSAGE_WITH_SOURCE, data: { content: '❌ Comando desconhecido.', flags: EPHEMERAL } })
