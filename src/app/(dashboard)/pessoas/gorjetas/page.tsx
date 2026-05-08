@@ -231,10 +231,18 @@ export default function GorjetasPage() {
       if (!rowDatas)    throw new Error('Linha EQUIPE (datas) não encontrada na planilha')
       if (!rowReceitas) throw new Error('Linha VALOR TOTAL PO (receitas) não encontrada na planilha')
 
+      function toISO(v: string | number | null): string | null {
+        if (typeof v === 'number')
+          return new Date((v - 25569) * 86400 * 1000).toISOString().slice(0, 10)
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()))
+          return v.trim()
+        return null
+      }
+
       const periodoRows: Record<string, unknown>[] = []
 
       for (let col = 2; col < rowDatas.length; col++) {
-        const data         = String(rowDatas[col] ?? '').trim()
+        const data          = toISO(rowDatas[col] ?? null)
         const receita_bruta = Number(rowReceitas[col])
         if (!data || isNaN(receita_bruta) || receita_bruta <= 0) continue
         periodoRows.push({ unit_id: unitId, data, receita_bruta, total_pontos: 1, fonte: 'import' })
