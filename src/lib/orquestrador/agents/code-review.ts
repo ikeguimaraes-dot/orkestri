@@ -7,10 +7,16 @@ export async function executeCodeReview(runId: string, payload: any): Promise<vo
   try {
     const { pull_request, repository } = payload
 
-    // 1. Busca diff do PR
-    const diffRes = await fetch(pull_request.diff_url, {
-      headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
-    })
+    // 1. Busca diff do PR via API (diff_url direta falha em repos privados)
+    const diffRes = await fetch(
+      `https://api.github.com/repos/${repository.full_name}/pulls/${pull_request.number}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github.diff',
+        },
+      }
+    )
     let diff = await diffRes.text()
     if (diff.length > MAX_DIFF_BYTES) {
       diff = diff.slice(0, MAX_DIFF_BYTES) + '\n\n[diff truncado — muito extenso]'
