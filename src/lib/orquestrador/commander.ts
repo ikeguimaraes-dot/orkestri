@@ -76,16 +76,21 @@ export async function executeCommander(pergunta: string, interactionToken: strin
         let result: any = {}
 
         if (block.name === 'get_system_status') {
+          const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
           const { data: runs } = await (supabase as any)
             .from('hos_runs')
-            .select('status, created_at')
-            .gte('created_at', new Date(Date.now() - 7 * 86_400_000).toISOString())
-            .is('archived_at', null)
+            .select('status, created_at, hos_jobs(name)')
+            .gte('created_at', since)
           const byStatus = (runs ?? []).reduce((acc: any, r: any) => {
             acc[r.status] = (acc[r.status] ?? 0) + 1
             return acc
           }, {})
-          result = { total: runs?.length ?? 0, by_status: byStatus }
+          const byJob = (runs ?? []).reduce((acc: any, r: any) => {
+            const job = r.hos_jobs?.name ?? 'desconhecido'
+            acc[job] = (acc[job] ?? 0) + 1
+            return acc
+          }, {})
+          result = { total: runs?.length ?? 0, by_status: byStatus, by_job: byJob, period: 'últimos 7 dias' }
         }
 
         if (block.name === 'list_pending_runs') {
