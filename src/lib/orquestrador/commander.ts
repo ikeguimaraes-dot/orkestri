@@ -81,6 +81,7 @@ export async function executeCommander(pergunta: string, interactionToken: strin
             .from('hos_runs')
             .select('status, created_at, hos_jobs(name)')
             .gte('created_at', since)
+            .is('archived_at', null)
           const byStatus = (runs ?? []).reduce((acc: any, r: any) => {
             acc[r.status] = (acc[r.status] ?? 0) + 1
             return acc
