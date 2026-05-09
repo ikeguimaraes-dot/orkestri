@@ -372,20 +372,20 @@ export default function GorjetasPage() {
           ) : (
             <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead className="bg-muted/30 border-b border-border">
                   <tr>
                     {['Colaborador','Cargo','Dias','Pontos','1ª Quinzena','2ª Quinzena','Total'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border">
                   {colabFiltrado.map((c, i) => (
-                    <tr key={c.employee_id} className={i % 2 === 0 ? 'bg-white' : 'bg-muted/30'}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{c.nome}</td>
+                    <tr key={c.employee_id} className={i % 2 === 0 ? 'bg-card' : 'bg-muted/20'}>
+                      <td className="px-4 py-3 font-medium text-foreground">{c.nome}</td>
                       <td className="px-4 py-3 text-gray-500">{c.cargo}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{c.dias_presentes}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{c.total_pontos}</td>
+                      <td className="px-4 py-3 text-center text-muted-foreground">{c.dias_presentes}</td>
+                      <td className="px-4 py-3 text-center text-muted-foreground">{c.total_pontos}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{fmt(c.quinzena1)}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{fmt(c.quinzena2)}</td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(c.total_gorjeta)}</td>
@@ -415,31 +415,31 @@ export default function GorjetasPage() {
             <div className="text-center py-12 text-gray-400 text-sm">Sem dados de receita para o período.</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-muted/30 border-b border-border">
                 <tr>
                   {['Data','Receita Bruta','Receita Líquida','Total Pontos','Valor/Ponto','Fonte'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {dias.map((d, i) => (
-                  <tr key={d.data} className={i % 2 === 0 ? 'bg-white' : 'bg-muted/30'}>
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                  <tr key={d.data} className={i % 2 === 0 ? 'bg-card' : 'bg-muted/20'}>
+                    <td className="px-4 py-3 font-medium text-foreground">
                       {new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
                       <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${
-                        quinzena(d.data) === 1 ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                        quinzena(d.data) === 1 ? 'bg-blue-950/40 text-blue-400' : 'bg-purple-950/40 text-purple-400'
                       }`}>Q{quinzena(d.data)}</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{fmt(d.receita_bruta)}</td>
-                    <td className="px-4 py-3 text-gray-700">{fmt(d.receita_liquida)}</td>
-                    <td className="px-4 py-3 text-center text-gray-600">{d.total_pontos.toLocaleString('pt-BR')}</td>
-                    <td className="px-4 py-3 font-semibold text-indigo-700">R$ {fmtN(d.valor_ponto)}</td>
+                    <td className="px-4 py-3 text-foreground">{fmt(d.receita_bruta)}</td>
+                    <td className="px-4 py-3 text-foreground">{fmt(d.receita_liquida)}</td>
+                    <td className="px-4 py-3 text-center text-muted-foreground">{d.total_pontos.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 font-semibold text-indigo-400">R$ {fmtN(d.valor_ponto)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        d.fonte === 'lorean' ? 'bg-green-50 text-green-700'  :
-                        d.fonte === 'import' ? 'bg-yellow-50 text-yellow-700':
-                                               'bg-gray-100 text-gray-500'
+                        d.fonte === 'lorean' ? 'bg-green-950/40 text-green-400'  :
+                        d.fonte === 'import' ? 'bg-yellow-950/40 text-yellow-400':
+                                               'bg-muted text-muted-foreground'
                       }`}>{d.fonte}</span>
                     </td>
                   </tr>
@@ -453,21 +453,21 @@ export default function GorjetasPage() {
       {/* ── Tab: Pontos por Cargo ── */}
       {tab === 'cargos' && (
         <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <p className="text-sm text-gray-500">Configuração de pontos por cargo · afeta cálculos futuros</p>
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-sm text-muted-foreground">Configuração de pontos por cargo · afeta cálculos futuros</p>
           </div>
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-muted/30 border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Cargo</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pontos</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Ação</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">Cargo</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase">Pontos</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase">Ação</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-border">
               {cargos.map(c => (
                 <tr key={c.id}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{c.cargo}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{c.cargo}</td>
                   <td className="px-4 py-3 text-center">
                     {editCargo === c.id ? (
                       <input
