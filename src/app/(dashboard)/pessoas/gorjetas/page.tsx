@@ -242,7 +242,7 @@ export default function GorjetasPage() {
       const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
       const ws = wb.Sheets['FREQUENCIA '] ?? wb.Sheets['FREQUENCIA']
       if (!ws) throw new Error('Aba FREQUENCIA não encontrada na planilha')
-      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' })
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, cellDates: true })
       const header = rows[0]
       if (!header?.length) throw new Error("Planilha sem cabeçalho")
 
