@@ -243,7 +243,7 @@ export default function GorjetasPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Gorjetas</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Sistema de pontos por dia · distribuição diária</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Sistema de pontos por dia · distribuição diária</p>
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -307,7 +307,7 @@ export default function GorjetasPage() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-border">
         <nav className="flex gap-6">
           {(['resumo', 'dias', 'cargos', 'importar'] as const).map(t => (
             <button
@@ -315,8 +315,8 @@ export default function GorjetasPage() {
               onClick={() => setTab(t)}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === t
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-indigo-400 text-indigo-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {t === 'resumo'    ? 'Por Colaborador'
@@ -338,9 +338,9 @@ export default function GorjetasPage() {
             className="w-full sm:w-80 text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           />
           {loading ? (
-            <div className="text-center py-12 text-gray-400 text-sm">Carregando…</div>
+            <div className="text-center py-12 text-muted-foreground text-sm">Carregando…</div>
           ) : !colabFiltrado.length ? (
-            <div className="text-center py-12 text-gray-400 text-sm">
+            <div className="text-center py-12 text-muted-foreground text-sm">
               Nenhum dado para {MESES[periodo.mes - 1]}/{periodo.ano}.<br />
               Importe um Excel ou aguarde integração Lorean.
             </div>
@@ -358,21 +358,21 @@ export default function GorjetasPage() {
                   {colabFiltrado.map((c, i) => (
                     <tr key={c.employee_id} className={i % 2 === 0 ? 'bg-card' : 'bg-muted/20'}>
                       <td className="px-4 py-3 font-medium text-foreground">{c.nome}</td>
-                      <td className="px-4 py-3 text-gray-500">{c.cargo}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{c.cargo}</td>
                       <td className="px-4 py-3 text-center text-muted-foreground">{c.dias_presentes}</td>
                       <td className="px-4 py-3 text-center text-muted-foreground">{c.total_pontos}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{fmt(c.quinzena1)}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{fmt(c.quinzena2)}</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(c.total_gorjeta)}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{fmt(c.quinzena1)}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{fmt(c.quinzena2)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(c.total_gorjeta)}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-indigo-50 border-t border-indigo-100">
+                <tfoot className="bg-indigo-950/30 border-t border-indigo-800/50">
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 text-xs font-bold text-indigo-700 uppercase">Total</td>
-                    <td className="px-4 py-3 text-right font-bold text-indigo-700">{fmt(colabFiltrado.reduce((s, c) => s + c.quinzena1, 0))}</td>
-                    <td className="px-4 py-3 text-right font-bold text-indigo-700">{fmt(colabFiltrado.reduce((s, c) => s + c.quinzena2, 0))}</td>
-                    <td className="px-4 py-3 text-right font-bold text-indigo-700">{fmt(colabFiltrado.reduce((s, c) => s + c.total_gorjeta, 0))}</td>
+                    <td colSpan={4} className="px-4 py-3 text-xs font-bold text-indigo-300 uppercase">Total</td>
+                    <td className="px-4 py-3 text-right font-bold text-indigo-300">{fmt(colabFiltrado.reduce((s, c) => s + c.quinzena1, 0))}</td>
+                    <td className="px-4 py-3 text-right font-bold text-indigo-300">{fmt(colabFiltrado.reduce((s, c) => s + c.quinzena2, 0))}</td>
+                    <td className="px-4 py-3 text-right font-bold text-indigo-300">{fmt(colabFiltrado.reduce((s, c) => s + c.total_gorjeta, 0))}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -385,9 +385,9 @@ export default function GorjetasPage() {
       {tab === 'dias' && (
         <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
           {loading ? (
-            <div className="text-center py-12 text-gray-400 text-sm">Carregando…</div>
+            <div className="text-center py-12 text-muted-foreground text-sm">Carregando…</div>
           ) : !dias.length ? (
-            <div className="text-center py-12 text-gray-400 text-sm">Sem dados de receita para o período.</div>
+            <div className="text-center py-12 text-muted-foreground text-sm">Sem dados de receita para o período.</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
@@ -454,7 +454,7 @@ export default function GorjetasPage() {
                         autoFocus
                       />
                     ) : (
-                      <span className="font-bold text-indigo-700 text-lg">{c.pontos}</span>
+                      <span className="font-bold text-indigo-300 text-lg">{c.pontos}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -462,7 +462,7 @@ export default function GorjetasPage() {
                       <div className="flex justify-center gap-2">
                         <button
                           onClick={() => saveCargo(c.id, editPontos)}
-                          className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition"
+                          className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-600 transition"
                         >Salvar</button>
                         <button
                           onClick={() => setEditCargo(null)}
@@ -472,7 +472,7 @@ export default function GorjetasPage() {
                     ) : (
                       <button
                         onClick={() => { setEditCargo(c.id); setEditPontos(c.pontos) }}
-                        className="text-xs text-indigo-600 hover:underline"
+                        className="text-xs text-indigo-400 hover:underline"
                       >Editar</button>
                     )}
                   </td>
@@ -495,10 +495,10 @@ export default function GorjetasPage() {
             }`}
           >
             <div className="text-4xl mb-3">{importing ? '⏳' : '📂'}</div>
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-medium text-foreground">
               {importing ? 'Processando…' : 'Clique para selecionar a planilha de gorjeta (.xlsx)'}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Padrão Meet &amp; Eat · aba "VALORES"</p>
+            <p className="text-xs text-muted-foreground mt-1">Padrão Meet &amp; Eat · aba "VALORES"</p>
           </div>
           <input
             ref={fileRef}
