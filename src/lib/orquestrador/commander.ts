@@ -103,7 +103,15 @@ export async function executeCommander(pergunta: string, interactionToken: strin
             .is('archived_at', null)
             .order('created_at', { ascending: false })
             .limit(limit)
-          result = { runs: runs ?? [] }
+          result = {
+            runs: (runs ?? []).map((r: any) => ({
+              id: r.id,
+              job: r.hos_jobs?.name ?? 'desconhecido',
+              criado: new Date(r.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+              deploy: r.payload?.url ?? r.payload?.deployment_url ?? '',
+              comando: `/aprovar run_id:${r.id}`,
+            })),
+          }
         }
 
         if (block.name === 'get_run_details') {
