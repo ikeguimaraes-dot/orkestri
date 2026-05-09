@@ -154,8 +154,9 @@ export function PontoApp({
         latitude: lat,
         longitude: lng,
         deviceInfo,
+        photoBase64,
       };
-      pushDebug("punch.payload", payload);
+      pushDebug("punch.payload", { ...payload, photoBase64: photoBase64 ? "[BASE64_TRUNCATED]" : null });
 
       const result = await registrarPunch(payload);
 

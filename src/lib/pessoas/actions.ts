@@ -1,9 +1,7 @@
 "use server"
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient, createServiceClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/server";
-import { getCurrentUnit } from "@/lib/auth/unit";
-import { createNotification } from "@/lib/notifications/actions";
+import { requireUser, getCurrentUser } from "@/lib/auth/server";import { createNotification } from "@/lib/notifications/actions";
 import type { ActionResult } from "@/lib/result";
 import { gerarHolerite } from "@/lib/pessoas/clt";
 import type {
@@ -1271,21 +1269,18 @@ const BYPASS_USER_ID = "ac559fa1-f10b-4ec4-9f4b-fafbc881a884";
 
 export async function getMyEmployee(userId?: string): Promise<Employee | null> {
   try {
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) return null;
-
-    let uid = userId;
-    if (!uid || uid === "bypass") {
-      // AUTH DESATIVADO: sem sessão real → usa id fixo de teste
-      const { data: { user } } = await supabase.auth.getUser();
-      uid = user?.id ?? BYPASS_USER_ID;
-    }
-
-    const { data, error } = await supabase
+    // TEMP (mock period): usa getCurrentUser() em vez de supabase.auth.getUser()
+    // para ser compatível com o mock em src/lib/auth/server.ts.
+    // Usa service_role pois a sessão Supabase pode estar ausente (iOS/mock).
+    // Seguro: query filtrada por user_id verificado pelo auth layer.
+    const authUser = await getCurrentUser();
+    if (!authUser) return null;
+    const service = createServiceClient();
+    if (!service) return null;
+    const { data, error } = await service
       .from(TABLE)
       .select("*")
-      .eq("user_id", uid)
-      .eq("ativo", true)
+      .eq("user_id", authUser.id)      .eq("ativo", true)
       .maybeSingle();
     if (error) {
       console.error("[getMyEmployee] error:", error.message);

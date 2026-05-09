@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { Database } from "@/types/database";
 
 /**
@@ -23,6 +23,21 @@ export async function createSupabaseServerClient(
   // AUTH DESATIVADO: sem sessão → service role para bypassar RLS
   const hasSession = cookieStore.getAll().some((c) => c.name.includes("auth-token"));
   if (!hasSession) return createServiceClient();
+
+  // Aplica o Set-Cookie do middleware se a request foi um Server Action
+  // (Next.js 14+ tem bug que dropa Set-Cookie de middleware em Server Actions)
+  const headerStore = await headers();
+  const middlewareCookies = headerStore.get("x-middleware-set-cookie");
+  if (middlewareCookies) {
+    try {
+      const parsed = JSON.parse(middlewareCookies);
+      for (const { name, value, options } of parsed) {
+        cookieStore.set(name, value, options);
+      }
+    } catch {
+      // Ignorar, provavelmente Server Component
+    }
+  }
 
   return createServerClient<Database>(url, anonKey, {
     cookies: {
