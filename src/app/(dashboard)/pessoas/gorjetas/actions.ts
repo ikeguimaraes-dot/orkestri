@@ -88,3 +88,52 @@ export async function saveGorjetaCargo(id: string, pontos: number): Promise<{ er
 
   return { error: error?.message ?? null }
 }
+
+export async function fetchEmployeesForGorjeta(
+  unitId: string
+): Promise<{ id: string; nome_completo: string; funcao: string }[]> {
+  const sb = createServiceClient()
+  if (!sb) return []
+  const { data } = await (sb as any)
+    .from('employees')
+    .select('id, nome, sobrenome, funcao')
+    .eq('unit_id', unitId)
+    .eq('ativo', true)
+  return (data ?? []).map((e: any) => ({
+    id: e.id,
+    nome_completo: `${e.nome ?? ''} ${e.sobrenome ?? ''}`.trim(),
+    funcao: e.funcao ?? '',
+  }))
+}
+
+export async function fetchGorjetaPeriodsMap(
+  unitId: string
+): Promise<Record<string, { id: string; receita_liquida: number }>> {
+  const sb = createServiceClient()
+  if (!sb) return {}
+  const { data } = await (sb as any)
+    .from('gorjeta_periodos')
+    .select('id, data, receita_liquida')
+    .eq('unit_id', unitId)
+  const map: Record<string, { id: string; receita_liquida: number }> = {}
+  for (const row of data ?? [])
+    map[row.data] = { id: row.id, receita_liquida: parseFloat(row.receita_liquida) }
+  return map
+}
+
+type DiaRow = {
+  unit_id: string; employee_id: string; periodo_id: string
+  data: string; cargo: string; pontos: number
+  presente: boolean; valor_calculado: number
+}
+
+export async function upsertGorjetaDias(
+  rows: DiaRow[]
+): Promise<{ error: string | null; count: number }> {
+  const sb = createServiceClient()
+  if (!sb) return { error: 'Service client indisponível', count: 0 }
+  const { error } = await (sb as any)
+    .from('gorjeta_dias')
+    .upsert(rows, { onConflict: 'unit_id,employee_id,data' })
+  return { error: error?.message ?? null, count: rows.length }
+}

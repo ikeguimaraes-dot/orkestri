@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useUnit, useSupabase } from '@/lib/auth/context'
 import * as XLSX from 'xlsx'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { upsertGorjetaPeriodos, fetchGorjetasDados, fetchGorjetaCargos, saveGorjetaCargo } from './actions'
+import { upsertGorjetaPeriodos, fetchGorjetasDados, fetchGorjetaCargos, saveGorjetaCargo, fetchEmployeesForGorjeta, fetchGorjetaPeriodsMap, upsertGorjetaDias } from './actions'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -87,6 +87,7 @@ export default function GorjetasPage() {
   const [editCargo,  setEditCargo]  = useState<string | null>(null)
   const [editPontos, setEditPontos] = useState<number>(0)
   const fileRef = useRef<HTMLInputElement>(null)
+  const fileRefFreq = useRef<HTMLInputElement>(null)
 
   // ── Carregar dados ao mudar filtros ────────────────────────────────────────
   const load = useCallback(async () => {
@@ -227,6 +228,86 @@ export default function GorjetasPage() {
     } finally {
       setImporting(false)
       if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+
+  const importarFrequencia = async (file: File) => {
+    if (!unitId) return
+    setImporting(true)
+    setImportLog([])
+    try {
+      setImportLog(p => [...p, '🔄 Lendo aba FREQUENCIA...'])
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
+      const ws = wb.Sheets['FREQUENCIA '] ?? wb.Sheets['FREQUENCIA']
+      if (!ws) throw new Error('Aba FREQUENCIA não encontrada na planilha')
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' })
+      const header = rows[0]
+      if (!header?.length) throw new Error("Planilha sem cabeçalho")
+
+      const dateCols: { col: number; date: string }[] = []
+      for (let i = 7; i < header.length; i++) {
+        const cell = header[i]
+        if (!cell) break
+        const d = cell instanceof Date ? cell.toISOString().split('T')[0]
+          : typeof cell === 'string' && /^\d{4}-\d{2}-\d{2}/.test(cell) ? cell.slice(0, 10)
+          : null
+        if (!d) break
+        dateCols.push({ col: i, date: d })
+      }
+      setImportLog(p => [...p, `📅 ${dateCols.length} datas (${dateCols[0]?.date} → ${dateCols.at(-1)?.date})`])
+
+      const [employees, periodsMap] = await Promise.all([
+        fetchEmployeesForGorjeta(unitId),
+        fetchGorjetaPeriodsMap(unitId),
+      ])
+      const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ')
+      const empMap = new Map(employees.map(e => [norm(e.nome_completo), e]))
+      setImportLog(p => [...p, `👥 ${employees.length} colaboradores · ${Object.keys(periodsMap).length} dias com receita`])
+
+      const colabRows = rows.slice(1).filter(r => r[0] && typeof r[0] === 'string' && r[0].trim())
+      const diasRows: any[] = []
+      const naoEncontrados = new Set<string>()
+
+      for (const dc of dateCols) {
+        const period = periodsMap[dc.date]
+        if (!period) continue
+        const presentes = colabRows
+          .filter(r => r[dc.col] === 'PRESENÇA')
+          .map(r => ({ nome: String(r[0]), cargo: String(r[1] ?? ''), pontos: Number(r[2]) || 0 }))
+        const totalPontos = presentes.reduce((s, p) => s + p.pontos, 0)
+        if (totalPontos === 0) continue
+        const valorPonto = period.receita_liquida / totalPontos
+        for (const p of presentes) {
+          const emp = empMap.get(norm(p.nome))
+          if (!emp) { naoEncontrados.add(p.nome); continue }
+          diasRows.push({
+            unit_id: unitId,
+            employee_id: emp.id,
+            periodo_id: period.id,
+            data: dc.date,
+            cargo: p.cargo,
+            pontos: p.pontos,
+            presente: true,
+            valor_calculado: Math.round(p.pontos * valorPonto * 100) / 100,
+          })
+        }
+      }
+
+      setImportLog(p => [...p, `📊 ${diasRows.length} registros calculados`])
+      if (naoEncontrados.size > 0)
+        setImportLog(p => [...p, `⚠️ ${naoEncontrados.size} nomes não encontrados: ${[...naoEncontrados].slice(0, 5).join(', ')}${naoEncontrados.size > 5 ? '...' : ''}`])
+
+      const { error, count } = await upsertGorjetaDias(diasRows)
+      if (error) throw new Error(error)
+      setImportLog(p => [...p, `✅ ${count} registros salvos`, '🎉 Importação FREQUENCIA concluída!'])
+      load()
+    } catch (err) {
+      setImportLog(p => [...p, `❌ Erro: ${err instanceof Error ? err.message : String(err)}`])
+    } finally {
+      setImporting(false)
+      if (fileRefFreq.current) fileRefFreq.current.value = ''
     }
   }
 
@@ -582,6 +663,29 @@ export default function GorjetasPage() {
             className="hidden"
             onChange={handleExcel}
           />
+
+          {/* ── Importar FREQUENCIA ── */}
+          <div className="border-t border-border pt-6 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Distribuição por Colaborador</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Aba FREQUENCIA · presença e pontos individuais</p>
+            </div>
+            <input
+              ref={fileRefFreq}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) importarFrequencia(f) }}
+            />
+            <button
+              onClick={() => fileRefFreq.current?.click()}
+              disabled={importing}
+              className="w-full border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 transition-colors disabled:opacity-50"
+            >
+              <p className="text-sm text-muted-foreground">Clique para selecionar a planilha de gorjeta (.xlsx)</p>
+              <p className="text-xs text-muted-foreground mt-1">Padrão Meet & Eat · aba "FREQUENCIA"</p>
+            </button>
+          </div>
 
           {importLog.length > 0 && (
             <div className="bg-gray-900 rounded-xl p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto">
