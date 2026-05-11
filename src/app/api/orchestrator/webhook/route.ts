@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
 
   const target = payload?.target
   const slug = target === 'production' ? 'deploy_prod' : 'qa_preview'
+  const deploymentId: string | undefined = payload?.id
 
   const { data: job } = await (supabase as any)
     .from('hos_jobs')
@@ -45,12 +46,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Job não encontrado' }, { status: 404 })
   }
 
+  if (deploymentId) {
+    const { data: existing } = await (supabase as any)
+      .from('hos_runs')
+      .select('id')
+      .eq('deployment_id', deploymentId)
+      .eq('job_id', job.id)
+      .maybeSingle()
+
+    if (existing) {
+      console.log(`[orchestrator] Evento duplicado ignorado — deployment_id: ${deploymentId}`)
+      return NextResponse.json({ ok: true, skipped: 'duplicate', run_id: existing.id })
+    }
+  }
+
   const { data: run, error } = await (supabase as any)
     .from('hos_runs')
     .insert({
       job_id: job.id,
       status: 'awaiting_approval',
       triggered_by,
+      deployment_id: deploymentId ?? null,
       payload: { deployment_url, event, raw: payload ?? {} },
       logs: [{ ts: new Date().toISOString(), msg: `Run criado via ${triggered_by} — evento: ${event}` }]
     })
