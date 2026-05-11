@@ -1,0 +1,2 @@
+ALTER TABLE public.hos_runs
+  ADD COLUMN IF NOT EXISTS title TEXT;
