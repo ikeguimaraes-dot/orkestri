@@ -98,18 +98,19 @@ export async function executeCommander(pergunta: string, interactionToken: strin
           const limit = block.input?.limit ?? 5
           const { data: runs } = await (supabase as any)
             .from('hos_runs')
-            .select('id, created_at, payload, hos_jobs(name)')
+            .select('id, created_at, deployment_id, payload, hos_jobs(name)')
             .eq('status', 'awaiting_approval')
             .is('archived_at', null)
             .order('created_at', { ascending: false })
             .limit(limit)
           result = {
             runs: (runs ?? []).map((r: any) => ({
-              id: r.id,
+              run_id: r.id,
               job: r.hos_jobs?.name ?? 'desconhecido',
               criado: new Date(r.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-              deploy: r.payload?.url ?? r.payload?.deployment_url ?? '',
-              comando: `/aprovar run_id:${r.id}`,
+              deploy_url: r.payload?.deployment_url ?? r.payload?.url ?? '',
+              aprovar: `/aprovar run_id:${r.id}`,
+              rejeitar: `/rejeitar run_id:${r.id}`,
             })),
           }
         }
@@ -117,10 +118,27 @@ export async function executeCommander(pergunta: string, interactionToken: strin
         if (block.name === 'get_run_details') {
           const { data: run } = await (supabase as any)
             .from('hos_runs')
-            .select('*, hos_jobs(name, slug)')
+            .select('id, status, created_at, updated_at, deployment_id, logs, result_data, payload, hos_jobs(name, slug)')
             .eq('id', block.input.run_id)
             .single()
-          result = run ?? { error: 'Run não encontrado' }
+          if (!run) {
+            result = { error: 'Run não encontrado' }
+          } else {
+            result = {
+              run_id: run.id,
+              job: run.hos_jobs?.name ?? 'desconhecido',
+              slug: run.hos_jobs?.slug ?? '',
+              status: run.status,
+              deployment_id: run.deployment_id ?? null,
+              deploy_url: run.payload?.deployment_url ?? run.payload?.url ?? '',
+              criado: new Date(run.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+              atualizado: new Date(run.updated_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+              logs: run.logs,
+              result_data: run.result_data,
+              aprovar: `/aprovar run_id:${run.id}`,
+              rejeitar: `/rejeitar run_id:${run.id}`,
+            }
+          }
         }
 
         if (block.name === 'get_jobs') {
