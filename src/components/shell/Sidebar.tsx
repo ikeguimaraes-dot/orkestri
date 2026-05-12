@@ -17,7 +17,7 @@ import {
   // pessoas
   Users, User, Briefcase, CalendarDays, Clock, Plane, CalendarX2, Timer,
   ShieldAlert, Receipt, DollarSign, Bus, GraduationCap, ClipboardCheck,
-  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock,
+  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock, Network,
   // comercial
   Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
   // marca
@@ -117,6 +117,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/pessoas/avaliacoes/9box",   label: "Matriz 9Box",     icon: LayoutGrid },
       { href: "/pessoas/pdi",               label: "PDI",             icon: ListChecks },
       { href: "/pessoas/reunioes",          label: "Reuniões 1:1",    icon: CalendarClock },
+      { href: "/pessoas/organograma",       label: "Organograma",     icon: Network },
       { href: "/pessoas/feedback",          label: "Feedback",        icon: MessageCircle },
       { href: "/pessoas/documentos",      label: "Documentos",        icon: FolderOpen },
       { href: "/pessoas/importacao",      label: "Importar Dados",    icon: Upload },
