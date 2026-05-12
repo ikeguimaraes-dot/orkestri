@@ -17,7 +17,7 @@ import {
   // pessoas
   Users, User, Briefcase, CalendarDays, Clock, Plane, CalendarX2, Timer,
   ShieldAlert, Receipt, DollarSign, Bus, GraduationCap, ClipboardCheck,
-  FolderOpen, Upload, FileBarChart2,
+  FolderOpen, Upload, FileBarChart2, MessageCircle,
   // comercial
   Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
   // marca
@@ -113,6 +113,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/pessoas/vale-transporte", label: "Vale Transporte",   icon: Bus },
       { href: "/pessoas/treinamentos",    label: "Treinamentos",      icon: GraduationCap },
       { href: "/pessoas/avaliacoes",      label: "Avaliações",        icon: ClipboardCheck },
+      { href: "/pessoas/feedback",        label: "Feedback",          icon: MessageCircle },
       { href: "/pessoas/documentos",      label: "Documentos",        icon: FolderOpen },
       { href: "/pessoas/importacao",      label: "Importar Dados",    icon: Upload },
       { href: "/pessoas/relatorio-ponto", label: "Relatório de Ponto", icon: FileBarChart2 },
