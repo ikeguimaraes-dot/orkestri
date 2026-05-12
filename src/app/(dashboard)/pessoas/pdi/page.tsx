@@ -9,8 +9,16 @@ import { PdiListClient } from "./pdi-list-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function PdiPage() {
+const PAGE_SIZE = 20;
+
+export default async function PdiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   await requireUser();
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
@@ -65,13 +73,13 @@ export default async function PdiPage() {
           <div style={{ color: "var(--text-3)", fontSize: 13 }}>Carregando…</div>
         }
       >
-        <PdiSection />
+        <PdiSection page={page} />
       </Suspense>
     </div>
   );
 }
 
-async function PdiSection() {
+async function PdiSection({ page }: { page: number }) {
   const unit = await getCurrentUnit();
 
   if (!unit) {
@@ -95,7 +103,7 @@ async function PdiSection() {
   const user = await requireUser();
   const myEmployee = await getEmployeeByUser(user.id, unit.id);
 
-  const pdis = myEmployee ? await listPdis(myEmployee.id) : [];
+  const pdiPage = myEmployee ? await listPdis(myEmployee.id, page, PAGE_SIZE) : null;
 
   return (
     <>
@@ -114,7 +122,13 @@ async function PdiSection() {
           Seu usuário não está vinculado a um colaborador nesta unit. PDIs não podem ser exibidos ou criados.
         </div>
       )}
-      <PdiListClient pdis={pdis} hasEmployee={!!myEmployee} />
+      <PdiListClient
+        pdis={pdiPage?.data ?? []}
+        hasEmployee={!!myEmployee}
+        page={page}
+        totalPages={pdiPage?.totalPages ?? 1}
+        count={pdiPage?.count ?? 0}
+      />
     </>
   );
 }

@@ -28,9 +28,15 @@ function formatDate(iso: string): string {
 export function PdiListClient({
   pdis,
   hasEmployee,
+  page,
+  totalPages,
+  count,
 }: {
   pdis: PdiWithMetas[];
   hasEmployee: boolean;
+  page: number;
+  totalPages: number;
+  count: number;
 }) {
   if (!hasEmployee) return null;
 
@@ -219,6 +225,40 @@ export function PdiListClient({
           </Link>
         );
       })}
+
+      {totalPages > 1 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            marginTop: 8,
+            fontSize: 13,
+            color: "var(--text-3)",
+          }}
+        >
+          {page > 1 && (
+            <Link
+              href={`?page=${page - 1}`}
+              style={{ color: "var(--brand)", textDecoration: "none", fontWeight: 600 }}
+            >
+              ← Anterior
+            </Link>
+          )}
+          <span>
+            Página {page} de {totalPages} · {count} PDI{count !== 1 ? "s" : ""}
+          </span>
+          {page < totalPages && (
+            <Link
+              href={`?page=${page + 1}`}
+              style={{ color: "var(--brand)", textDecoration: "none", fontWeight: 600 }}
+            >
+              Próximo →
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
