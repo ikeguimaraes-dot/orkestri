@@ -2405,6 +2405,9 @@ export type Database = {
         };
       };
       // ── Notificações in-app (migration 024) ──────────────────
+      // Note: hos_jobs e hos_runs (migration 033) usam (supabase as any) nos
+      // agentes do orquestrador — supabase-js v2 não infere corretamente tabelas
+      // com colunas JSONB em tipos manuais. Ver CLAUDE.md §5.5.
       notifications: {
         Row: {
           id: string;

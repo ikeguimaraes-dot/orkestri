@@ -1,60 +1,73 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { sendDiscordMessage } from '@/lib/discord/notify'
 
-const SCORE_THRESHOLD = 70
+const SCORE_THRESHOLD = parseInt(process.env.SCORE_THRESHOLD ?? '70', 10)
 const JOB_SLUG = 'score_monitor'
+
+// Shapes locais para os resultados das queries do orquestrador.
+// hos_jobs e hos_runs ainda não têm inferência completa via SupabaseClient<Database>
+// (supabase-js v2 não resolve JSONB em tipos manuais) — seguindo CLAUDE.md §5.5.
+type HosJob = { id: string }
+
+type EmpRow = {
+  id: string
+  nome: string | null
+  sobrenome: string | null
+  funcao: string | null
+  score: number | null
+  unit: { name: string } | null
+}
+
+type OpenRunPayload = { employee_id?: string }
 
 export async function runScoreMonitor(): Promise<{ created: number }> {
   const supabase = createServiceClient()
   if (!supabase) throw new Error('Supabase indisponível')
 
+  // hos_jobs: tabela do orquestrador, usa as any conforme CLAUDE.md §5.5
   const { data: job } = await (supabase as any)
     .from('hos_jobs')
     .select('id')
     .eq('slug', JOB_SLUG)
     .eq('is_active', true)
-    .single()
+    .single() as { data: HosJob | null }
 
   if (!job) throw new Error('Job score_monitor não encontrado')
 
-  // Colaboradores ativos com score abaixo do threshold
-  const { data: employees, error } = await (supabase as any)
+  // employees: tipado em database.ts — sem cast no cliente
+  const { data: rawEmployees, error } = await supabase
     .from('employees')
-    .select(`
-      id,
-      nome,
-      sobrenome,
-      funcao,
-      score,
-      unit:units(name)
-    `)
+    .select('id, nome, sobrenome, funcao, score, unit:units(name)')
     .eq('ativo', true)
     .lt('score', SCORE_THRESHOLD)
     .not('score', 'is', null)
 
   if (error) throw new Error(error.message)
 
-  // Runs abertos para o mesmo job — deduplicação por employee_id no payload
-  const { data: openRuns } = await (supabase as any)
+  const employees = (rawEmployees ?? []) as unknown as EmpRow[]
+
+  // hos_runs: tabela do orquestrador, usa as any conforme CLAUDE.md §5.5
+  const { data: openRunsData } = await (supabase as any)
     .from('hos_runs')
     .select('payload')
     .eq('job_id', job.id)
-    .in('status', ['pending', 'awaiting_approval'])
+    .in('status', ['pending', 'awaiting_approval']) as { data: { payload: OpenRunPayload | null }[] | null }
 
   const openEmployeeIds = new Set<string>(
-    (openRuns ?? []).map((r: any) => r.payload?.employee_id as string)
+    (openRunsData ?? []).map((r) => r.payload?.employee_id ?? '').filter(Boolean)
   )
 
   let created = 0
 
-  for (const emp of employees ?? []) {
+  for (const emp of employees) {
     if (openEmployeeIds.has(emp.id)) continue
 
     const nomeCompleto = [emp.nome, emp.sobrenome].filter(Boolean).join(' ')
     const unidade = emp.unit?.name ?? 'N/A'
     const funcao = emp.funcao ?? 'N/A'
-    const delta = SCORE_THRESHOLD - emp.score
-    const title = `⚠️ ${nomeCompleto} — score ${emp.score} (abaixo de ${SCORE_THRESHOLD})`
+    const score = emp.score ?? 0
+    const delta = SCORE_THRESHOLD - score
+    const title = `⚠️ ${nomeCompleto} — score ${score} (abaixo de ${SCORE_THRESHOLD})`
 
     const { error: insertErr } = await (supabase as any)
       .from('hos_runs')
@@ -63,15 +76,7 @@ export async function runScoreMonitor(): Promise<{ created: number }> {
         status: 'awaiting_approval',
         triggered_by: 'cron',
         title,
-        payload: {
-          employee_id: emp.id,
-          nome: nomeCompleto,
-          funcao,
-          unidade,
-          score: emp.score,
-          threshold: SCORE_THRESHOLD,
-          delta,
-        },
+        payload: { employee_id: emp.id, nome: nomeCompleto, funcao, unidade, score, threshold: SCORE_THRESHOLD, delta },
         logs: [{ ts: new Date().toISOString(), msg: title }],
       })
 
