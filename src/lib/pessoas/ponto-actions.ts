@@ -17,11 +17,17 @@
 //   1) cookie auth → quem está chamando? (auth.getUser)
 //   2) authz → esse user é dono do employeeId OU tem role na unit dele?
 //   3) só então service_role insere
+//
+// Geofencing (migration 063):
+//   Se a unit tiver latitude/longitude/geofence_radius_m configurados E
+//   o punch tiver coordenadas, calcula distância Haversine.
+//   ≤ raio → aprovado = true (aprovação automática)
+//   > raio → aprovado = null  (cai na fila de aprovação manual)
+//   Sem coords na unit ou no punch → aprovado = null (comportamento padrão)
 
 import { createSupabaseServerClient, createServiceClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth/server";
-import type { ActionResult } from "@/lib/result";
 import type { PunchTipo, TimeClockPunch } from "@/types/pessoas";
+import { nextPunchTipo, PUNCH_LABEL } from "@/lib/pessoas/punch";
 
 export type RegistrarPunchInput = {
   employeeId: string;
@@ -32,6 +38,11 @@ export type RegistrarPunchInput = {
   photoBase64?: string | null;
 };
 
+/** ActionResult estendido para punch — inclui minutosRestantes no erro de pausa bloqueada. */
+export type PunchActionResult =
+  | { ok: true; data: TimeClockPunch }
+  | { ok: false; error: string; minutosRestantes?: number };
+
 const VALID_TIPOS: ReadonlyArray<PunchTipo> = [
   "entrada",
   "saida",
@@ -39,9 +50,27 @@ const VALID_TIPOS: ReadonlyArray<PunchTipo> = [
   "intervalo_fim",
 ];
 
+// ── Haversine ─────────────────────────────────────────────────────────────────
+// Retorna distância em metros entre dois pontos (WGS84).
+function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6_371_000; // raio médio da Terra em metros
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export async function registrarPunch(
   input: RegistrarPunchInput,
-): Promise<ActionResult<TimeClockPunch>> {
+): Promise<PunchActionResult> {
   // ── Validação ────────────────────────────────────────────────
   if (!input?.employeeId) {
     return { ok: false, error: "employeeId obrigatório" };
@@ -56,7 +85,7 @@ export async function registrarPunch(
     return { ok: false, error: "Supabase indisponível" };
   }
   const { data: { user } } = await cookieClient.auth.getUser();
-  // AUTH DESATIVADO: sem sessão real → usa id fixo de teste (Mariana Costa)
+  // AUTH DESATIVADO: sem sessão real → usa id fixo de teste (Ike)
   const BYPASS_USER_ID = "ac559fa1-f10b-4ec4-9f4b-fafbc881a884";
   const effectiveUserId = user?.id ?? BYPASS_USER_ID;
 
@@ -65,6 +94,7 @@ export async function registrarPunch(
   if (!service) {
     return { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY ausente no servidor" };
   }
+
   type EmpRow = { id: string; user_id: string | null; unit_id: string };
   const { data: employee, error: empErr } = await service
     .from("employees")
@@ -98,56 +128,137 @@ export async function registrarPunch(
     };
   }
 
-  // ── 3) Insert via service_role (bypassa RLS) ─────────────────
-  // ── 3.1) Upload da Foto (se enviada) ─────────────────────────
-  let photoUrl: string | null = null;
+  // ── 2.5) Validação de sequência e regras de negócio ──────────
+  // Meia-noite em São Paulo (UTC-3, sem DST desde 2019) como limite do dia.
+  const agora = new Date();
+  const agoraSP = new Date(agora.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const meiaNoiteSP = new Date(agoraSP.getFullYear(), agoraSP.getMonth(), agoraSP.getDate());
+  const offsetMs = agora.getTime() - agoraSP.getTime();
+  const meiaNoiteUTC = new Date(meiaNoiteSP.getTime() + offsetMs);
+
+  type PunchRow = Pick<TimeClockPunch, "id" | "tipo" | "timestamp_punch">;
+  const { data: punchesHoje, error: punchesErr } = await service
+    .from("time_clock_punches")
+    .select("id, tipo, timestamp_punch")
+    .eq("employee_id", employee.id)
+    .gte("timestamp_punch", meiaNoiteUTC.toISOString())
+    .order("timestamp_punch", { ascending: true })
+    .returns<PunchRow[]>();
+
+  if (punchesErr) {
+    return { ok: false, error: `Erro ao verificar pontos do dia: ${punchesErr.message}` };
+  }
+
+  const punchesDodia = punchesHoje ?? [];
+
+  // Regra 1a — máximo 4 registros por dia
+  if (punchesDodia.length >= 4) {
+    return { ok: false, error: "Jornada já encerrada. Máximo de 4 registros por dia atingido." };
+  }
+
+  // Regra 1b — sequência obrigatória: entrada → intervalo_inicio → intervalo_fim → saida
+  const proximoEsperado = nextPunchTipo(punchesDodia as TimeClockPunch[]);
+  if (proximoEsperado === null) {
+    return { ok: false, error: "Jornada já encerrada para hoje." };
+  }
+  if (input.tipo !== proximoEsperado) {
+    return {
+      ok: false,
+      error: `Registro inválido. Próximo esperado: ${PUNCH_LABEL[proximoEsperado]}.`,
+    };
+  }
+
+  // Regra 2 — intervalo disponível somente após 1h da entrada
+  if (input.tipo === "intervalo_inicio") {
+    const entradaPunch = punchesDodia.find((p) => p.tipo === "entrada");
+    if (entradaPunch) {
+      const diffMs = agora.getTime() - new Date(entradaPunch.timestamp_punch).getTime();
+      const diffMinutos = diffMs / 60_000;
+      if (diffMinutos < 60) {
+        const minutosRestantes = Math.ceil(60 - diffMinutos);
+        return {
+          ok: false,
+          error: `Pausa disponível somente 1h após a entrada. Aguarde ${minutosRestantes} minuto${minutosRestantes !== 1 ? "s" : ""}.`,
+          minutosRestantes,
+        };
+      }
+    }
+  }
+
+  // ── 2.6) Geofencing — aprovação automática ────────────────────
+  // Busca coordenadas da unidade (migration 063).
+  // Columns podem não existir em DEV antes da migration — tratar null graciosamente.
+  let aprovado: boolean | null = null;
+
+  type UnitGeoRow = {
+    latitude: number | null;
+    longitude: number | null;
+    geofence_radius_m: number | null;
+  };
+  const { data: unitGeo } = await service
+    .from("units")
+    .select("latitude, longitude, geofence_radius_m")
+    .eq("id", employee.unit_id)
+    .maybeSingle<UnitGeoRow>();
+
+  if (
+    unitGeo?.latitude != null &&
+    unitGeo?.longitude != null &&
+    input.latitude != null &&
+    input.longitude != null
+  ) {
+    const radius = unitGeo.geofence_radius_m ?? 200;
+    const distancia = haversineMeters(
+      unitGeo.latitude,
+      unitGeo.longitude,
+      input.latitude,
+      input.longitude,
+    );
+    aprovado = distancia <= radius;
+    console.info(
+      `[registrarPunch] geofence: distância=${distancia.toFixed(1)}m raio=${radius}m aprovado=${aprovado}`,
+    );
+  }
+  // Se unit sem coords OU punch sem coords → aprovado = null (pendente)
+
+  // ── 3) Upload da Foto (se enviada) ───────────────────────────
+  let photoPath: string | null = null;
   if (input.photoBase64) {
     try {
-      // Extrair apenas os dados do base64 ignorando o header (data:image/jpeg;base64,...)
       const matches = input.photoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       const base64Data = (matches ? matches[2] : input.photoBase64) ?? input.photoBase64;
       const buffer = Buffer.from(base64Data, "base64");
-      
-      const BUCKET_NAME = "ponto-fotos";
-      const { data: buckets } = await service.storage.listBuckets();
-      
-      if (buckets && !buckets.find((b) => b.name === BUCKET_NAME)) {
-        await service.storage.createBucket(BUCKET_NAME, { public: true });
-      }
 
       const fileName = `${employee.id}/${Date.now()}.jpg`;
       const { error: uploadErr } = await service.storage
-        .from(BUCKET_NAME)
+        .from("punch-photos")
         .upload(fileName, buffer, {
           contentType: "image/jpeg",
           upsert: true,
         });
 
       if (!uploadErr) {
-        const { data: publicUrlData } = service.storage
-          .from(BUCKET_NAME)
-          .getPublicUrl(fileName);
-        photoUrl = publicUrlData.publicUrl;
+        photoPath = fileName;
       }
     } catch (err) {
       console.error("[registrarPunch] Falha no upload da foto", err);
     }
   }
 
-  // Combinar photoUrl dentro do deviceInfo JSON
-  let deviceInfoObj: Record<string, any> = {};
+  // Combinar photoPath dentro do deviceInfo JSON
+  let deviceInfoObj: Record<string, unknown> = {};
   if (input.deviceInfo) {
     try {
-      deviceInfoObj = JSON.parse(input.deviceInfo);
+      deviceInfoObj = JSON.parse(input.deviceInfo) as Record<string, unknown>;
     } catch { /* ignore parse err */ }
   }
-  if (photoUrl) {
-    deviceInfoObj.photoUrl = photoUrl;
+  if (photoPath) {
+    deviceInfoObj.photoPath = photoPath;
   }
-  const finalDeviceInfo = Object.keys(deviceInfoObj).length > 0 
-    ? JSON.stringify(deviceInfoObj) 
-    : null;
+  const finalDeviceInfo =
+    Object.keys(deviceInfoObj).length > 0 ? JSON.stringify(deviceInfoObj) : null;
 
+  // ── 4) Insert via service_role (bypassa RLS) ─────────────────
   const { data, error } = await service
     .from("time_clock_punches")
     .insert({
@@ -157,6 +268,7 @@ export async function registrarPunch(
       longitude: input.longitude ?? null,
       device_info: finalDeviceInfo,
       timestamp_punch: new Date().toISOString(),
+      aprovado,               // true = aprovado por geofence | null = pendente manual
     } as never)
     .select()
     .single();
