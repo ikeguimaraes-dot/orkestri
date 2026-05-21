@@ -20,6 +20,8 @@ import {
   FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock, Network, UserPlus,
   // comercial
   Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
+  // agentes
+  Cpu,
   // marca
   Bookmark, Info, Globe, Award,
   // inteligencia
@@ -131,6 +133,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Handshake,
     defaultOpen: false,
     items: [
+      { href: "/comercial",             label: "Visão Geral",  icon: Handshake },
       { href: "/cliente",               label: "CRM Clientes", icon: MessageSquare },
       { href: "/comercial/reservas",    label: "Reservas",     icon: CalendarCheck },
       { href: "/eventos",               label: "Eventos / OS", icon: CalendarDays },
@@ -165,6 +168,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/inteligencia/feedback", label: "Bugs & Feedback", icon: Bug },
       { href: "/inteligencia/roadmap",  label: "Roadmap",        icon: Map },
       { href: "/orquestrador",          label: "Orquestrador",   icon: Workflow },
+      { href: "/agentes",               label: "Agentes IA",     icon: Cpu },
     ],
   },
 ];
