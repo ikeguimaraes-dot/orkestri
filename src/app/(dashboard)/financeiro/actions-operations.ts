@@ -2,9 +2,10 @@
 
 import { createOperationsClient } from "@/lib/supabase/operations-client";
 import type {
-  WorkdayResumo,
+  VendaDiaria,
   MetaProjecao,
   TituloAPagar,
+  WorkdayPagamento,
 } from "@/types/operations-database";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -40,31 +41,67 @@ function jsWeekdayToMetaIndex(jsDay: number): number {
   return map[jsDay] ?? 0;
 }
 
-// ── Workday ───────────────────────────────────────────────────────────────────
+// ── Tipos derivados expostos para as pages ────────────────────────────────────
 
-/** Todos os dias de um mês no workday_resumo. */
-export async function getWorkdayResumoMes(
-  competencia: string,
-): Promise<WorkdayResumo[]> {
+/**
+ * Linha de um dia no Fluxo de Caixa — independente da fonte.
+ *
+ * Campos nuláveis (custo, cmv_pct, lucro, pagamentos) ficam null quando a fonte
+ * é vendas_diarias (que não carrega CMV nem mix de pagamentos).
+ * Os formatters do UI já tratam null como "—".
+ */
+export type WorkdayDiaEnriquecido = {
+  /** ID único usado como React key. */
+  workday_id: number;
+  /** Data ISO "YYYY-MM-DD". */
+  data: string;
+  bruto: number;
+  desconto: number | null;
+  gorjeta: number | null;
+  /** CMV em R$. Null quando fonte = vendas_diarias. */
+  custo: number | null;
+  /** CMV em %. Null quando fonte = vendas_diarias. */
+  cmv_pct: number | null;
+  /** Lucro bruto. Null quando fonte = vendas_diarias. */
+  lucro: number | null;
+  acessos: number | null;
+  ticket_medio: number | null;
+  /** Mix de pagamentos. Null quando fonte = vendas_diarias. */
+  pagamentos: WorkdayPagamento[] | null;
+  // enriched
+  meta_dia: number | null;
+  atingimento_pct: number | null;
+  dia_semana: string;
+};
+
+// ── vendas_diarias ────────────────────────────────────────────────────────────
+
+/**
+ * Lê vendas_diarias do mês e agrega por data (múltiplos turnos → 1 linha/dia).
+ * Fonte: import automático ~8h diariamente — dados sempre atualizados.
+ */
+async function getVendasDiariasMes(competencia: string): Promise<VendaDiaria[]> {
   const ops = createOperationsClient();
   if (!ops) return [];
 
   const { dateFrom, dateTo } = competenciaToRange(competencia);
   const { data, error } = await ops
-    .from("workday_resumo")
+    .from("vendas_diarias")
     .select(
-      "workday_id,data,acessos,permanencia,cmv_pct,ticket_zero,ticket_real,ticket_medio,bruto,desconto,gorjeta,custo,despesa,lucro,consumo_total,cancelamentos_total,descontos_total,total_recebido,pagamentos,turnos,ambientes",
+      "id,data_venda,turno,qtd_clientes,faturamento_bruto,gorjetas,descontos_clientes,descontos_socios,descontos_internos,meta_faturamento",
     )
-    .gte("data", dateFrom)
-    .lte("data", dateTo)
-    .order("data", { ascending: true });
+    .gte("data_venda", dateFrom)
+    .lte("data_venda", dateTo)
+    .order("data_venda", { ascending: true });
 
   if (error) {
-    console.error("[getWorkdayResumoMes]", error.message);
+    console.error("[getVendasDiariasMes]", error.message);
     return [];
   }
-  return (data ?? []) as WorkdayResumo[];
+  return (data ?? []) as VendaDiaria[];
 }
+
+// ── Metas ─────────────────────────────────────────────────────────────────────
 
 /** Metas do mês (meta total + array diário por dia da semana). */
 export async function getMetasMes(
@@ -114,19 +151,15 @@ export async function getTitulosAPagar(
   return (data ?? []) as TituloAPagar[];
 }
 
-// ── Tipos derivados expostos para as pages ────────────────────────────────────
-
-export type WorkdayDiaEnriquecido = WorkdayResumo & {
-  meta_dia: number | null;
-  atingimento_pct: number | null;
-  dia_semana: string;
-};
+// ── Fluxo de Caixa ────────────────────────────────────────────────────────────
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /**
- * Combina workday_resumo + metas_projecoes → array enriquecido pronto para render.
- * Chama `getWorkdayResumoMes` + `getMetasMes` em paralelo.
+ * Combina vendas_diarias + metas_projecoes → array enriquecido pronto para render.
+ *
+ * Fonte: vendas_diarias — import automático diário às ~8h (sempre atualizado).
+ * Campos custo/cmv_pct/lucro/pagamentos ficam null (não disponíveis nessa fonte).
  */
 export async function getFluxoCaixaMes(competencia: string): Promise<{
   dias: WorkdayDiaEnriquecido[];
@@ -144,39 +177,69 @@ export async function getFluxoCaixaMes(competencia: string): Promise<{
     atingimento_pct: number | null;
   };
 }> {
-  const [resumo, meta] = await Promise.all([
-    getWorkdayResumoMes(competencia),
+  const [rows, meta] = await Promise.all([
+    getVendasDiariasMes(competencia),
     getMetasMes(competencia),
   ]);
 
-  const dias: WorkdayDiaEnriquecido[] = resumo.map((r) => {
-    const date = new Date(`${r.data}T12:00:00`);
+  // Agrega turnos por data_venda → uma linha por dia
+  const byDate = new Map<string, { firstId: number; rows: VendaDiaria[] }>();
+  for (const row of rows) {
+    const entry = byDate.get(row.data_venda);
+    if (!entry) {
+      byDate.set(row.data_venda, { firstId: row.id, rows: [row] });
+    } else {
+      entry.rows.push(row);
+    }
+  }
+
+  // Constrói dias enriquecidos na mesma ordem (data ASC já garantida pelo ORDER BY)
+  const dias: WorkdayDiaEnriquecido[] = [];
+  for (const [dataVenda, { firstId, rows: turnos }] of byDate.entries()) {
+    const bruto = turnos.reduce((s, r) => s + (r.faturamento_bruto ?? 0), 0);
+    const desconto = turnos.reduce(
+      (s, r) =>
+        s +
+        (r.descontos_clientes ?? 0) +
+        (r.descontos_socios ?? 0) +
+        (r.descontos_internos ?? 0),
+      0,
+    );
+    const gorjeta = turnos.reduce((s, r) => s + (r.gorjetas ?? 0), 0);
+    const acessos = turnos.reduce((s, r) => s + (r.qtd_clientes ?? 0), 0);
+    const ticket_medio =
+      acessos > 0 ? Math.round((bruto / acessos) * 100) / 100 : null;
+
+    const date = new Date(`${dataVenda}T12:00:00`);
     const jsDay = date.getDay();
     const metaIdx = jsWeekdayToMetaIndex(jsDay);
     const metaDia = meta?.metas_diarias?.[metaIdx] ?? null;
-    const atingimento =
-      metaDia && metaDia > 0 ? Math.round((r.bruto / metaDia) * 100) : null;
-    return {
-      ...r,
-      meta_dia: metaDia,
-      atingimento_pct: atingimento,
-      dia_semana: DIAS_SEMANA[jsDay] ?? "—",
-    };
-  });
+    const atingimento_pct =
+      metaDia && metaDia > 0 ? Math.round((bruto / metaDia) * 100) : null;
 
-  // totais
-  const bruto = dias.reduce((s, d) => s + (d.bruto ?? 0), 0);
+    dias.push({
+      workday_id: firstId,
+      data: dataVenda,
+      bruto,
+      desconto,
+      gorjeta,
+      custo: null,
+      cmv_pct: null,
+      lucro: null,
+      acessos,
+      ticket_medio,
+      pagamentos: null,
+      meta_dia: metaDia,
+      atingimento_pct,
+      dia_semana: DIAS_SEMANA[jsDay] ?? "—",
+    });
+  }
+
+  // Totais do mês
+  const bruto = dias.reduce((s, d) => s + d.bruto, 0);
   const desconto = dias.reduce((s, d) => s + (d.desconto ?? 0), 0);
   const gorjeta = dias.reduce((s, d) => s + (d.gorjeta ?? 0), 0);
-  const custo = dias.reduce((s, d) => s + (d.custo ?? 0), 0);
-  const lucro = dias.reduce((s, d) => s + (d.lucro ?? 0), 0);
   const acessos = dias.reduce((s, d) => s + (d.acessos ?? 0), 0);
-  const cmv_pct_medio =
-    dias.length > 0
-      ? Math.round(
-          dias.reduce((s, d) => s + (d.cmv_pct ?? 0), 0) / dias.length,
-        )
-      : null;
   const ticket_medio =
     acessos > 0 ? Math.round((bruto / acessos) * 100) / 100 : null;
   const meta_total = meta?.meta_faturamento ?? 0;
@@ -190,16 +253,18 @@ export async function getFluxoCaixaMes(competencia: string): Promise<{
       bruto,
       desconto,
       gorjeta,
-      custo,
-      lucro,
+      custo: 0,      // não disponível em vendas_diarias
+      lucro: 0,      // não disponível em vendas_diarias
       acessos,
-      cmv_pct_medio,
+      cmv_pct_medio: null, // não disponível em vendas_diarias
       ticket_medio,
       meta_total,
       atingimento_pct,
     },
   };
 }
+
+// ── Contas a Pagar — KPIs ─────────────────────────────────────────────────────
 
 /** KPIs para a página de contas a pagar. */
 export type PagarKpis = {
