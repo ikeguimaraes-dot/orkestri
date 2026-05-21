@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 
-type View = "aprovacao" | "resumo";
+type View = "aprovacao" | "resumo" | "gestao";
 
 export function PontoToggle({ active }: { active: View }) {
   function pill(view: View, label: string, href: string) {
@@ -49,6 +49,7 @@ export function PontoToggle({ active }: { active: View }) {
     >
       {pill("aprovacao", "Aprovação de punches", "/pessoas/ponto")}
       {pill("resumo", "Resumo mensal", "/pessoas/ponto/resumo")}
+      {pill("gestao", "Gestão ao vivo", "/pessoas/ponto/gestao")}
     </div>
   );
 }
