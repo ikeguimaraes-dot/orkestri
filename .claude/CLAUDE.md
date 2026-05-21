@@ -1,7 +1,7 @@
 # KPH OS — Guia Permanente do Claude Code
 
 > Leia este arquivo inteiro antes de fazer qualquer coisa. É a memória completa do projeto.
-> Última atualização: 2026-05-12 (sync com codebase real).
+> Última atualização: 2026-05-21 (PR #36 fix/ponto-validacao-server).
 
 ---
 
@@ -163,11 +163,12 @@ src/
         aprovacoes/
         conciliacao/
         dre/
-        fluxo/
+        fluxo/                    ← REAL: workday_resumo + metas_projecoes (PDV)
         orcamento/
-        pagar/
+        pagar/                    ← REAL: titulos_a_pagar (TOTVS)
         receber/
-        actions.ts
+        actions.ts                ← KPH OS Supabase
+        actions-operations.ts     ← Supabase de Operações (Meet & Eat)
       inteligencia/
         adocao/                   ← adoção do sistema
         cross/                    ← cross-sell / análise cruzada
@@ -239,7 +240,10 @@ src/
           [id]/
           novo/
           actions.ts
-        ponto/                    ← registro de ponto + resumo
+        ponto/                    ← registro de ponto + resumo + gestão ao vivo
+          gestao/                 ← gestão ao vivo (presença em tempo real)
+            page.tsx
+            gestao-client.tsx     ← auto-refresh 30s via router.refresh()
           resumo/
           actions.ts
         relatorio-ponto/          ← relatório mensal importado do Totvs
@@ -269,6 +273,8 @@ src/
         cron/ferias/              ← cron 0 8 * * 1
         cron/folha/               ← cron 0 8 25 * *
         cron/onboarding/          ← cron 0 9 * * *
+        cron/score/               ← cron 30 8 * * 1
+        cron/banco-horas/         ← cron 45 8 * * 1
         escalate/                 ← cron */30 * * * *
         github-webhook/           ← recebe eventos de PR do GitHub
         qa-callback/              ← recebe resultado dos smoke tests
@@ -333,6 +339,7 @@ src/
       agents/
         code-review.ts · compliance-documental.ts
         ferias-monitor.ts · folha-validator.ts · onboarding-checker.ts
+        score-monitor.ts · banco-horas-monitor.ts
     pessoas/
       actions.ts                  ← CRUD employees, payslips, etc.
       clt.ts                      ← calcINSS, calcIRRF, calcFGTS (CLT 2024)
@@ -341,14 +348,15 @@ src/
       headcount-actions.ts
       import-actions.ts           ← importação ponto_mensal
       labor.ts                    ← hoursWorked, timeToMinutes
-      ponto-actions.ts
+      ponto-actions.ts            ← registrarPunch + PunchActionResult (minutosRestantes)
       ponto-mensal-actions.ts
-      punch.ts                    ← endpoint app mobile
+      punch.ts                    ← nextPunchTipo, PUNCH_LABEL, PUNCH_COLOR, calcWorkHours, formatHHMM, formatMinutesAsHours
       schema.ts                   ← schemas Zod de RH
       score-monthly.ts
       score.ts                    ← SCORE_BASE, WARNING_DELTA, ABSENCE_DELTA
     supabase/
       client.ts                   ← getBrowserClient()
+      operations-client.ts        ← createOperationsClient(), createOperationsAnonClient() — banco Meet & Eat
       proxy.ts                    ← middleware helper para refresh de token
       server.ts                   ← createSupabaseServerClient(), createServiceClient()
     export.ts                     ← downloadCsv() — exporta CSV com BOM UTF-8
@@ -358,6 +366,7 @@ src/
   types/
     compras-ingredientes.ts
     database.ts                   ← tipos gerados pelo Supabase CLI
+    operations-database.ts        ← tipos manuais do banco Meet & Eat (12 tabelas workday + titulos)
     index.ts
     pessoas.ts                    ← tipos adicionais de RH
 ```
@@ -586,7 +595,7 @@ export async function requireUser(): Promise<CurrentUser> {
 
 ## 7. BANCO DE DADOS — SCHEMA COMPLETO
 
-### Migrations (001–059)
+### Migrations (001–062)
 
 | Migration | Descrição |
 |-----------|-----------|
@@ -644,6 +653,9 @@ export async function requireUser(): Promise<CurrentUser> {
 | 057_reunioes_1on1 | reunioes_1on1 + reuniao_action_items |
 | 058_organograma | ALTER employees ADD COLUMN manager_id UUID REFERENCES employees(id) |
 | 059_onboarding | onboarding_templates + onboarding_tarefas + onboarding_runs + onboarding_checklist |
+| 060_hos_app_documents | (verificar conteúdo — arquivo presente no repo, aplicação a confirmar) |
+| 061_score_banco_horas_monitors | Seed hos_jobs: score_monitor + banco_horas_monitor (ON CONFLICT DO NOTHING) |
+| 062_punch_photos_bucket | Bucket Storage `punch-photos` (privado, 5 MB, jpeg/png/webp) + RLS SELECT managers + RLS SELECT colaborador próprio. Upload/delete exclusivo do service_role. Path: `{employee_uuid}/{timestamp_ms}.jpg` |
 
 ### Tabelas por domínio
 
@@ -822,6 +834,8 @@ Sistema de governança de agentes IA. **Human-in-the-loop:** agente detecta → 
 | ferias_monitor | Férias Monitor | FALSE | cron 0 8 * * 1 (segunda) |
 | folha_validator | Folha Validator | FALSE | cron 0 8 25 * * (dia 25) |
 | onboarding_checker | Onboarding Checker | FALSE | cron 0 9 * * * |
+| score_monitor | Score Monitor | FALSE | cron 30 8 * * 1 (segunda 8:30 UTC) |
+| banco_horas_monitor | Banco de Horas Monitor | FALSE | cron 45 8 * * 1 (segunda 8:45 UTC) |
 
 ### Crons Vercel (vercel.json)
 
@@ -831,7 +845,9 @@ Sistema de governança de agentes IA. **Human-in-the-loop:** agente detecta → 
   { "path": "/api/orchestrator/cron/compliance", "schedule": "0 8 * * *" },
   { "path": "/api/orchestrator/cron/ferias",     "schedule": "0 8 * * 1" },
   { "path": "/api/orchestrator/cron/folha",      "schedule": "0 8 25 * *" },
-  { "path": "/api/orchestrator/cron/onboarding", "schedule": "0 9 * * *" }
+  { "path": "/api/orchestrator/cron/onboarding", "schedule": "0 9 * * *" },
+  { "path": "/api/orchestrator/cron/score",      "schedule": "30 8 * * 1" },
+  { "path": "/api/orchestrator/cron/banco-horas","schedule": "45 8 * * 1" }
 ]
 ```
 
@@ -885,7 +901,8 @@ await supabase.from("hos_runs")
 | /pessoas/colaboradores | CRUD colaboradores | employees |
 | /pessoas/headcount | Análise de headcount | employees |
 | /pessoas/escala | Grade de turnos | shifts |
-| /pessoas/ponto | Registro de ponto | time_clock_punches |
+| /pessoas/ponto | Registro de ponto (aprovação de punches) | time_clock_punches |
+| /pessoas/ponto/gestao | Gestão ao vivo — presença em tempo real, auto-refresh 30s | time_clock_punches, employees |
 | /pessoas/ferias | Férias | vacations |
 | /pessoas/faltas | Faltas | absences |
 | /pessoas/horas-extras | Horas extras | overtime_records |
@@ -898,6 +915,7 @@ await supabase.from("hos_runs")
 | /pessoas/avaliacoes/ciclos | Ciclos 360° | avaliacao_ciclos, avaliacao_participantes |
 | /pessoas/avaliacoes/9box | Matriz 9Box | performance_reviews |
 | /pessoas/pdi | PDI + metas | pdis, pdi_metas |
+| /pessoas/analytics | People Analytics (turnover, absenteísmo, headcount, time-to-hire) | employees, absences, vacations, job_openings |
 | /pessoas/reunioes | Reuniões 1:1 | reunioes_1on1, reuniao_action_items |
 | /pessoas/organograma | Árvore hierárquica CSS-only | employees (manager_id) |
 | /pessoas/onboarding | Runs de onboarding | onboarding_runs, onboarding_checklist |
@@ -921,7 +939,10 @@ await supabase.from("hos_runs")
 | /compras/cotacoes | Cotações | price_quotes |
 | /compras/ingredientes | Cadastro ingredientes | ingredients |
 | /eventos | O.S. de eventos | events, event_staff, event_menu_items |
-| /financeiro | DRE, fluxo, lançamentos | lancamentos, financial_periods |
+| /financeiro | Hub financeiro — KPIs por marca | lancamentos, financial_periods (KPH OS) |
+| /financeiro/fluxo | Fluxo de Caixa PDV real (workday) | workday_resumo, metas_projecoes (ops) |
+| /financeiro/pagar | Contas a Pagar TOTVS | titulos_a_pagar (ops) |
+| /financeiro/[brand_slug] | DRE por marca + lançamentos manuais | financial_periods, cash_flow_entries (KPH OS) |
 | /inteligencia/metas | KPIs por marca | brand_targets |
 | /inteligencia/wbr | Weekly Business Review | — |
 | /marca | Brandbook e canais | brand_links |
@@ -950,6 +971,11 @@ await supabase.from("hos_runs")
 | `CRON_SECRET` | Server Only | Header `Authorization: Bearer $CRON_SECRET` nos crons Vercel |
 | `QA_CALLBACK_SECRET` | Server Only | Autenticação do callback QA Playwright |
 | `NEXT_PUBLIC_APP_URL` | Client + Server | URL base (https://kph-os.vercel.app em prod) |
+| `OPERATIONS_SUPABASE_URL` | Server Only | Supabase Meet & Eat (laodipuodgrpqykrupms) — Financeiro/Operações |
+| `OPERATIONS_SUPABASE_ANON_KEY` | Server Only | Anon key do banco de operações |
+| `OPERATIONS_SUPABASE_SERVICE_KEY` | Server Only | Service role do banco de operações — **NUNCA** no bundle |
+| `SCORE_THRESHOLD` | Server Only | Threshold score disciplinar (default: 70) — score_monitor |
+| `BH_THRESHOLD_HOURS` | Server Only | Threshold banco de horas em horas (default: 40) — banco_horas_monitor |
 
 ---
 
@@ -961,6 +987,18 @@ export type ActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 ```
+
+### `src/lib/pessoas/ponto-actions.ts` — tipo extendido
+`registrarPunch` retorna `PunchActionResult` (não `ActionResult`) para incluir `minutosRestantes`:
+```typescript
+export type PunchActionResult =
+  | { ok: true; data: TimeClockPunch }
+  | { ok: false; error: string; minutosRestantes?: number };
+```
+Regras de negócio enforçadas server-side:
+- Sequência obrigatória: `entrada → intervalo_inicio → intervalo_fim → saida`
+- Máximo 4 registros por dia (SP timezone)
+- `intervalo_inicio` bloqueado se < 60 min da `entrada` — retorna `minutosRestantes`
 
 ### `src/lib/format.ts`
 - `formatBRL(v)` — formata número como moeda BRL (pt-BR)
@@ -1006,7 +1044,7 @@ sendDiscordMessage(content)  // POST para DISCORD_WEBHOOK_URL
 
 1. **Criar branch:** `feat/nome-do-modulo` ou `fix/nome-do-bug`
 2. **Migration SQL primeiro** se há mudanças no banco:
-   - Criar `supabase/migrations/0XX_descricao.sql` (próximo número: **060**)
+   - Criar `supabase/migrations/0XX_descricao.sql` (próximo número: **063**)
    - Aplicar **manualmente** no Supabase SQL Editor antes de mergear
 3. **Server Actions** em `src/app/(dashboard)/modulo/actions.ts`:
    - `"use server"` no topo
@@ -1147,13 +1185,72 @@ Projeto usa shadcn/ui v4 com variáveis CSS em `globals.css`. Tailwind v4 com `t
 
 ---
 
-## 16. OBSERVAÇÕES FINAIS
+## 16. BANCO DE OPERAÇÕES — MEET & EAT
+
+Segundo Supabase conectado ao KPH OS. **Não tem RLS** — acesso exclusivo via service role no servidor.
+
+- **Project ID:** `laodipuodgrpqykrupms`
+- **URL:** `https://laodipuodgrpqykrupms.supabase.co`
+- **Cliente:** `createOperationsClient()` em `src/lib/supabase/operations-client.ts`
+- **Tipos:** `src/types/operations-database.ts`
+- **Actions:** `src/app/(dashboard)/financeiro/actions-operations.ts`
+
+### Tabelas disponíveis
+
+| Tabela | Fonte | Dados |
+|--------|-------|-------|
+| `workday_resumo` | PDV Workday | KPIs diários completos: CMV%, ticket, lucro, bruto, acessos, pagamentos JSONB, ambientes, turnos, perfil de cliente. Dado mais rico do sistema. |
+| `workday_venda` | PDV Workday | Vendas consolidadas por dia (simplificado) |
+| `workday_produtos` | PDV Workday | Ranking de produtos com CMV por produto |
+| `workday_grupos` | PDV Workday | Mix por categoria (Bebidas, Pratos, etc.) |
+| `workday_caixas` | PDV Workday | Detalhes por caixa físico e operador |
+| `workday_usuarios` | PDV Workday | Ranking de garçons/vendedores |
+| `titulos_a_pagar` | ERP TOTVS | AP completo: fornecedor, CNPJ, vencimento, saldo, dias de atraso, situação, ref_mes (YYYY-MM-01) |
+| `vendas_diarias` | Preenchimento manual | Backup/validação das vendas diárias por turno |
+| `metas_projecoes` | Manual | Meta mensal + array `metas_diarias[seg..dom]` por dia da semana |
+| `notas_nutri` | Auditoria | Notas de inspeção nutricional |
+| `auditoria_nutricional` | Auditoria | Auditoria nutricional detalhada |
+| `notas_detalhadas` | Auditoria | Scores por tópico/setor |
+
+### Padrão de uso
+
+```typescript
+import { createOperationsClient } from "@/lib/supabase/operations-client";
+import type { WorkdayResumo } from "@/types/operations-database";
+
+// Sempre em Server Actions ou Route Handlers
+const ops = createOperationsClient();
+if (!ops) return { ok: false, error: "Operações indisponível" };
+
+const { data } = await ops
+  .from("workday_resumo")
+  .select("data, bruto, lucro, cmv_pct, ticket_medio, acessos")
+  .gte("data", "2026-05-01")
+  .order("data", { ascending: false });
+```
+
+### Disponibilidade de dados
+
+- `workday_resumo` e `workday_*`: sincronizado até **abril 2026** (PDV não importado para maio ainda)
+- `titulos_a_pagar`: disponível para **abril 2026** (ref_mes = '2026-04-01')
+- `metas_projecoes`: disponível para **maio 2026** (mes_ano = '2026-5')
+- `vendas_diarias`: disponível para **maio 2026**
+
+---
+
+## 17. OBSERVAÇÕES FINAIS
 
 1. **Migrations rodam manualmente.** Verificar no Supabase Dashboard antes de mergear.
 
 2. **Atualizar este CLAUDE.md** sempre que houver mudanças arquiteturais: nova tabela, novo padrão, novo módulo.
 
 3. **PRs mergeados até 12/05/2026:** #1 ao #33 (PDI, Reuniões, Organograma, Onboarding, Feedback, 9Box, etc.).
+
+   **PRs abertos em 21/05/2026:**
+   - **#34** `feat/score-banco-horas-monitors` — Score Monitor + Banco de Horas Monitor (aguarda merge)
+   - **#32** `feat/people-analytics` — People Analytics (aguarda merge; conflito resolvido, rebased sobre main)
+   - **#35** `feat/financeiro-operations` — Fluxo de Caixa PDV + Contas a Pagar TOTVS
+   - **#36** `fix/ponto-validacao-server` — bucket punch-photos + validação server-side de sequência/1h + tela Gestão ao vivo
 
 4. **Sprint 6 — backlog pendente:**
    - Login persistente (auth ativo para usuários reais)
@@ -1163,7 +1260,7 @@ Projeto usa shadcn/ui v4 com variáveis CSS em `globals.css`. Tailwind v4 com `t
 
 5. **Tabela não está em `database.ts`?** Usar `(supabase as any).from("tabela")`. Acontece com migrations recentes antes de regenerar os tipos com `supabase gen types typescript`.
 
-6. **Próxima migration:** número `060`. Verificar: `ls supabase/migrations/ | sort | tail -5`.
+6. **Próxima migration:** número `063`. Verificar: `ls supabase/migrations/ | sort | tail -5`.
 
 7. **Claude API model:** sempre `claude-sonnet-4-20250514` nos agentes do orquestrador.
 
