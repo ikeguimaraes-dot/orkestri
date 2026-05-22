@@ -21,7 +21,9 @@
     "./table": "./src/ui/table.tsx",
     "./tabs": "./src/ui/tabs.tsx",
     "./textarea": "./src/ui/textarea.tsx",
-    "./tooltip": "./src/ui/tooltip.tsx"
+    "./tooltip": "./src/ui/tooltip.tsx",
+    "./kpi-card": "./src/ui/kpi-card.tsx",
+    "./progress-bar": "./src/ui/progress-bar.tsx"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
