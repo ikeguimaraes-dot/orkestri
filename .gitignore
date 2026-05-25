@@ -49,3 +49,4 @@ ref_system/
 
 # turbo
 .turbo
+.claude/scheduled_tasks.lock
