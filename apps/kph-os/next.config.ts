@@ -20,6 +20,11 @@ const nextConfig = {
         source: `${prefix}/_next/:path*`,
         destination: `https://${host}${prefix}/_next/:path*`,
       },
+      // Exact match (no trailing path) — :path* doesn't match empty string
+      {
+        source: `${prefix}`,
+        destination: `https://${host}${prefix}`,
+      },
       {
         source: `${prefix}/:path*`,
         destination: `https://${host}${prefix}/:path*`,
