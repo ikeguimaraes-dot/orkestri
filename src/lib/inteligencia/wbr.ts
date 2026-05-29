@@ -2,6 +2,7 @@
 // Tipos e funções puras ficam em wbr-shared.ts (importável por Client Components).
 
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createOperationsClient } from "@kph/db/supabase/operations-client";
 import type { WbrBrandKpi, WbrPayload, WbrTrendPoint } from "./wbr-shared";
 
 export type { WbrBrandKpi, WbrPayload } from "./wbr-shared";
@@ -113,6 +114,26 @@ export async function loadWbr(refDateIso: string): Promise<WbrPayload | null> {
       p.brand_id,
       (receitaByBrand.get(p.brand_id) ?? 0) + Number(e.valor),
     );
+  }
+
+  // 2b) Fallback Meet & Eat: vendas_diarias quando cash_flow_entries está vazio na semana.
+  // vendas_diarias = import automático do PDV (~diário), sem brand_id — implicitamente Meet & Eat.
+  const meetEatBrand = brands.find((b) => b.slug === "meet-and-eat");
+  if (meetEatBrand && (receitaByBrand.get(meetEatBrand.id) ?? 0) === 0) {
+    const ops = createOperationsClient();
+    if (ops) {
+      const { data: vendasWeek } = await ops
+        .from("vendas_diarias")
+        .select("faturamento_bruto")
+        .gte("data_venda", weekStart)
+        .lte("data_venda", weekEnd)
+        .returns<Array<{ faturamento_bruto: number | null }>>();
+      const totalVendas = (vendasWeek ?? []).reduce(
+        (s, r) => s + (r.faturamento_bruto ?? 0),
+        0,
+      );
+      if (totalVendas > 0) receitaByBrand.set(meetEatBrand.id, totalVendas);
+    }
   }
 
   // 3) Projeção semanal — cash_flow_projections rateadas (mensal/4)
@@ -323,6 +344,28 @@ export async function loadWbr(refDateIso: string): Promise<WbrPayload | null> {
     const inner = trendMap.get(ws) ?? new Map<string, number>();
     inner.set(p.brand_id, (inner.get(p.brand_id) ?? 0) + Number(e.valor));
     trendMap.set(ws, inner);
+  }
+
+  // 10b) Fallback vendas_diarias para o trend de Meet & Eat
+  if (meetEatBrand) {
+    const ops2 = createOperationsClient();
+    if (ops2) {
+      const { data: vendasTrend } = await ops2
+        .from("vendas_diarias")
+        .select("data_venda, faturamento_bruto")
+        .gte("data_venda", trendStart)
+        .lte("data_venda", weekEnd)
+        .returns<Array<{ data_venda: string; faturamento_bruto: number | null }>>();
+      for (const row of vendasTrend ?? []) {
+        const { start: ws } = weekRange(row.data_venda);
+        const inner = trendMap.get(ws) ?? new Map<string, number>();
+        // Só usa vendas_diarias se cash_flow não tem dados para essa semana/brand
+        if ((inner.get(meetEatBrand.id) ?? 0) === 0 && (row.faturamento_bruto ?? 0) > 0) {
+          inner.set(meetEatBrand.id, (inner.get(meetEatBrand.id) ?? 0) + (row.faturamento_bruto ?? 0));
+          trendMap.set(ws, inner);
+        }
+      }
+    }
   }
 
   const trend: WbrTrendPoint[] = weekStarts.map((ws) => {

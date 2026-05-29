@@ -3,7 +3,18 @@
 // monta delta MoM por KPI por marca.
 
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createOperationsClient } from "@kph/db/supabase/operations-client";
 import { periodoToDate, previousPeriodo, toNumber } from "@/lib/metas/types";
+
+/** "YYYY-MM-01" → { dateFrom: "YYYY-MM-01", dateTo: "YYYY-MM-DD" } */
+function competenciaToRange(competencia: string): { dateFrom: string; dateTo: string } {
+  const [y, m] = competencia.split("-");
+  const year = parseInt(y ?? "1970", 10);
+  const month = parseInt(m ?? "1", 10);
+  const lastDay = new Date(year, month, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return { dateFrom: competencia, dateTo: `${year}-${pad(month)}-${lastDay}` };
+}
 
 export type CrossKpiRow = {
   brand_id: string;
@@ -88,6 +99,39 @@ export async function loadCross(periodo: string): Promise<CrossPayload | null> {
 
   // Inclui todas as brands ativas, mesmo sem dados DRE
   for (const b of brandsAll) allBrandIds.add(b.id);
+
+  // Fallback Meet & Eat: se DRE atual está vazio, usa vendas_diarias (MTD)
+  // vendas_diarias = import automático do PDV sem brand_id — implicitamente Meet & Eat
+  const meetEatBrand = brandsAll.find((b) => b.slug === "meet-and-eat");
+  if (meetEatBrand && !atual.has(meetEatBrand.id)) {
+    const ops = createOperationsClient();
+    if (ops && competenciaAtual) {
+      const { dateFrom, dateTo } = competenciaToRange(competenciaAtual);
+      const { data: vendasMes } = await ops
+        .from("vendas_diarias")
+        .select("faturamento_bruto")
+        .gte("data_venda", dateFrom)
+        .lte("data_venda", dateTo)
+        .returns<Array<{ faturamento_bruto: number | null }>>();
+      const totalVendas = (vendasMes ?? []).reduce(
+        (s, r) => s + (r.faturamento_bruto ?? 0),
+        0,
+      );
+      if (totalVendas > 0) {
+        atual.set(meetEatBrand.id, {
+          brand_id: meetEatBrand.id,
+          brand_name: meetEatBrand.name,
+          brand_slug: meetEatBrand.slug,
+          brand_color: meetEatBrand.color,
+          competencia: competenciaAtual,
+          receita_bruta: totalVendas,
+          cmv_pct: null,
+          prime_cost_pct: null,
+          ebitda_pct: null,
+        });
+      }
+    }
+  }
 
   const crossRows: CrossKpiRow[] = [];
   for (const brandId of allBrandIds) {

@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createOperationsClient } from "@kph/db/supabase/operations-client";
 import { requireUser } from "@kph/auth/server";
 import type { ActionResult } from "@/lib/result";
 import {
@@ -95,6 +96,34 @@ export async function listMetasForPeriodo(
         cmv_pct: toNumber(r.cmv_pct),
         prime_pct: toNumber(r.prime_cost_pct),
       });
+    }
+
+    // 3b) Fallback Meet & Eat: vendas_diarias (MTD) quando v_dre_consolidado está vazio
+    // vendas_diarias = import PDV automático, sem brand_id — implicitamente Meet & Eat
+    const meetEatBrand = brands.find((b) => b.slug === "meet-and-eat");
+    if (meetEatBrand && !dreByBrand.has(meetEatBrand.id)) {
+      const ops = createOperationsClient();
+      if (ops) {
+        const [y, m] = competencia.split("-");
+        const year = parseInt(y ?? "1970", 10);
+        const month = parseInt(m ?? "1", 10);
+        const lastDay = new Date(year, month, 0).getDate();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const dateTo = `${year}-${pad(month)}-${lastDay}`;
+        const { data: vendasMes } = await ops
+          .from("vendas_diarias")
+          .select("faturamento_bruto")
+          .gte("data_venda", competencia)
+          .lte("data_venda", dateTo)
+          .returns<Array<{ faturamento_bruto: number | null }>>();
+        const totalVendas = (vendasMes ?? []).reduce(
+          (s, r) => s + (r.faturamento_bruto ?? 0),
+          0,
+        );
+        if (totalVendas > 0) {
+          dreByBrand.set(meetEatBrand.id, { receita: totalVendas, cmv_pct: null, prime_pct: null });
+        }
+      }
     }
 
     // 4) Eventos KPI da competência
