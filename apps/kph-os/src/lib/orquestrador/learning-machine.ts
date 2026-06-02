@@ -237,11 +237,12 @@ Analise e responda APENAS com JSON válido nesta estrutura exata (sem markdown, 
         rawAnalysis = aiResponse.content?.[0]?.text ?? null;
 
         if (rawAnalysis) {
-          const cleaned = rawAnalysis
-            .replace(/^```(?:json)?\s*/m, "")
-            .replace(/\s*```\s*$/m, "")
-            .trim();
-          insights = JSON.parse(cleaned) as LMReportInsight;
+          // Extract JSON robustly: find first { and last } regardless of markdown fences
+          const jsonStart = rawAnalysis.indexOf("{");
+          const jsonEnd = rawAnalysis.lastIndexOf("}");
+          if (jsonStart !== -1 && jsonEnd > jsonStart) {
+            insights = JSON.parse(rawAnalysis.slice(jsonStart, jsonEnd + 1)) as LMReportInsight;
+          }
         }
       }
     } catch (e) {
