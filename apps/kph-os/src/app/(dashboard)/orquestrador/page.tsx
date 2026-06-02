@@ -1,11 +1,18 @@
 import { listOrchestratorRuns } from "@/lib/orquestrador/actions";
-import { loadLMReports } from "@/lib/orquestrador/learning-machine";
+import { loadLMReports, generateLearningMachineReport } from "@/lib/orquestrador/learning-machine";
 import type { LMReport } from "@/lib/orquestrador/learning-machine";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
+
+async function triggerLearningMachine() {
+  "use server";
+  await generateLearningMachineReport();
+  revalidatePath("/orquestrador");
+}
 
 export default async function OrchestratorPage() {
   const [runs, lmReports] = await Promise.all([
@@ -29,8 +36,8 @@ export default async function OrchestratorPage() {
         </div>
       </div>
 
-      {/* Learning Machine Panel */}
-      {latestLM && <LearningMachinePanel report={latestLM} />}
+      {/* Learning Machine Panel — always visible */}
+      <LearningMachinePanel report={latestLM} triggerAction={triggerLearningMachine} />
 
       <div className="grid gap-4">
         <div className="rounded-md border bg-card text-card-foreground shadow-sm p-6">
@@ -107,8 +114,14 @@ export default async function OrchestratorPage() {
   );
 }
 
-function LearningMachinePanel({ report }: { report: LMReport }) {
-  const score = report.insights?.score_operacional ?? null;
+function LearningMachinePanel({
+  report,
+  triggerAction,
+}: {
+  report: LMReport | null;
+  triggerAction: () => Promise<void>;
+}) {
+  const score = report?.insights?.score_operacional ?? null;
   const scoreColor =
     score === null ? "text-muted-foreground" :
     score >= 80 ? "text-green-600 dark:text-green-400" :
@@ -124,99 +137,124 @@ function LearningMachinePanel({ report }: { report: LMReport }) {
             <h3 className="text-2xl font-semibold leading-none tracking-tight">
               Learning Machine
             </h3>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-              Semana {report.week_number}/{report.year}
-            </span>
+            {report && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                Semana {report.week_number}/{report.year}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {report.insights?.headline ?? "Análise semanal dos 40 agentes IA do KPH OS."}
+            {report?.insights?.headline ?? "Análise semanal dos 40 agentes IA do KPH OS."}
           </p>
         </div>
-        {score !== null && (
-          <div className="text-right">
-            <div className={`text-4xl font-bold tabular-nums ${scoreColor}`}>{score}</div>
-            <div className="text-xs text-muted-foreground">score operacional</div>
-          </div>
-        )}
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="rounded-md bg-muted/50 p-3">
-          <div className="text-2xl font-bold tabular-nums">{report.total_runs}</div>
-          <div className="text-xs text-muted-foreground">execuções</div>
-        </div>
-        <div className="rounded-md bg-muted/50 p-3">
-          <div className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
-            {report.active_agents}
-          </div>
-          <div className="text-xs text-muted-foreground">agentes ativos</div>
-        </div>
-        <div className="rounded-md bg-muted/50 p-3">
-          <div className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
-            {report.inactive_agents}
-          </div>
-          <div className="text-xs text-muted-foreground">agentes dormentes</div>
+        <div className="flex items-center gap-3">
+          {score !== null && (
+            <div className="text-right">
+              <div className={`text-4xl font-bold tabular-nums ${scoreColor}`}>{score}</div>
+              <div className="text-xs text-muted-foreground">score operacional</div>
+            </div>
+          )}
+          <form action={triggerAction}>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 whitespace-nowrap"
+            >
+              {report ? "↻ Atualizar" : "▶ Gerar análise agora"}
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Top agents */}
-      {report.top_agents && report.top_agents.length > 0 && (
-        <div className="mb-4">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Top agentes da semana
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {report.top_agents.map((a) => (
-              <span
-                key={a.nome}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-              >
-                {a.nome}
-                <span className="opacity-70">×{a.runs}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Insight da semana */}
-      {report.insights?.insight_da_semana && (
-        <div className="border-l-4 border-yellow-400 pl-3 py-1">
-          <p className="text-sm text-foreground/80 italic leading-relaxed">
-            {report.insights.insight_da_semana}
+      {!report ? (
+        /* Empty state */
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="text-4xl mb-3">📊</div>
+          <p className="text-sm font-medium text-foreground mb-1">Nenhuma análise gerada ainda</p>
+          <p className="text-xs text-muted-foreground max-w-sm">
+            O cron roda toda sexta às 08:00 BRT. Clique em "Gerar análise agora" para criar o primeiro relatório manualmente.
           </p>
         </div>
-      )}
-
-      {/* Next steps */}
-      {report.insights?.proximos_passos && report.insights.proximos_passos.length > 0 && (
-        <div className="mt-4">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Próximos passos
+      ) : (
+        <>
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="rounded-md bg-muted/50 p-3">
+              <div className="text-2xl font-bold tabular-nums">{report.total_runs}</div>
+              <div className="text-xs text-muted-foreground">execuções</div>
+            </div>
+            <div className="rounded-md bg-muted/50 p-3">
+              <div className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">
+                {report.active_agents}
+              </div>
+              <div className="text-xs text-muted-foreground">agentes ativos</div>
+            </div>
+            <div className="rounded-md bg-muted/50 p-3">
+              <div className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                {report.inactive_agents}
+              </div>
+              <div className="text-xs text-muted-foreground">agentes dormentes</div>
+            </div>
           </div>
-          <div className="space-y-1">
-            {report.insights.proximos_passos.slice(0, 3).map((step, i) => {
-              const prioColor =
-                step.prioridade === "alta" ? "text-red-600 dark:text-red-400" :
-                step.prioridade === "media" ? "text-yellow-600 dark:text-yellow-400" :
-                "text-muted-foreground";
-              return (
-                <div key={i} className="flex items-start gap-2 text-sm">
-                  <span className={`text-xs font-bold uppercase mt-0.5 shrink-0 w-10 ${prioColor}`}>
-                    {step.prioridade}
+
+          {/* Top agents */}
+          {report.top_agents && report.top_agents.length > 0 && (
+            <div className="mb-4">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                Top agentes da semana
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {report.top_agents.map((a) => (
+                  <span
+                    key={a.nome}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                  >
+                    {a.nome}
+                    <span className="opacity-70">×{a.runs}</span>
                   </span>
-                  <span className="text-foreground/80">{step.acao}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                ))}
+              </div>
+            </div>
+          )}
 
-      <div className="mt-4 text-xs text-muted-foreground">
-        Gerado em {new Date(report.generated_at).toLocaleString("pt-BR")} · Cron toda sexta 08:00 BRT
-      </div>
+          {/* Insight da semana */}
+          {report.insights?.insight_da_semana && (
+            <div className="border-l-4 border-yellow-400 pl-3 py-1 mb-4">
+              <p className="text-sm text-foreground/80 italic leading-relaxed">
+                {report.insights.insight_da_semana}
+              </p>
+            </div>
+          )}
+
+          {/* Next steps */}
+          {report.insights?.proximos_passos && report.insights.proximos_passos.length > 0 && (
+            <div className="mb-4">
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                Próximos passos
+              </div>
+              <div className="space-y-1">
+                {report.insights.proximos_passos.slice(0, 3).map((step, i) => {
+                  const prioColor =
+                    step.prioridade === "alta" ? "text-red-600 dark:text-red-400" :
+                    step.prioridade === "media" ? "text-yellow-600 dark:text-yellow-400" :
+                    "text-muted-foreground";
+                  return (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <span className={`text-xs font-bold uppercase mt-0.5 shrink-0 w-10 ${prioColor}`}>
+                        {step.prioridade}
+                      </span>
+                      <span className="text-foreground/80">{step.acao}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-muted-foreground">
+            Gerado em {new Date(report.generated_at).toLocaleString("pt-BR")} · Cron toda sexta 08:00 BRT
+          </div>
+        </>
+      )}
     </div>
   );
 }
