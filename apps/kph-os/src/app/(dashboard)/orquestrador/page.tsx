@@ -1,7 +1,9 @@
 import { listOrchestratorRuns } from "@/lib/orquestrador/actions";
 import { loadLMReports, generateLearningMachineReport } from "@/lib/orquestrador/learning-machine";
-import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { handleApproval } from "@/lib/orquestrador/approve-handler";
+import { createSupabaseServerClient, createServiceClient } from "@kph/db/supabase/server";
 import type { LMReport } from "@/lib/orquestrador/learning-machine";
+import { ApproveJobButton } from "./ApproveJobButton";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -17,12 +19,45 @@ type OrquestradorInsight = {
   proximo_passo: string;
 };
 
-// ── Server Action ─────────────────────────────────────────────────────
+// ── Server Actions ────────────────────────────────────────────────────
 
 async function triggerLearningMachine() {
   "use server";
   await generateLearningMachineReport();
   revalidatePath("/orquestrador");
+}
+
+async function approveOrquestradorJob(jobId: string) {
+  "use server";
+  const result = await handleApproval(jobId);
+  revalidatePath("/orquestrador");
+  return result;
+}
+
+// ── Pending jobs loader ────────────────────────────────────────────────
+
+type OrquestradorJob = {
+  id: string;
+  type: string;
+  status: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+async function loadPendingJobs(): Promise<OrquestradorJob[]> {
+  try {
+    const supabase = createServiceClient();
+    if (!supabase) return [];
+    const { data } = await (supabase as any)
+      .from("orquestrador_jobs")
+      .select("id, type, status, payload, created_at")
+      .in("status", ["pending", "waiting_approval", "awaiting_approval"])
+      .order("created_at", { ascending: false })
+      .limit(20);
+    return (data ?? []) as OrquestradorJob[];
+  } catch {
+    return [];
+  }
 }
 
 // ── Insight generator ─────────────────────────────────────────────────
@@ -140,13 +175,14 @@ Responda APENAS com este JSON:
 // ── Page ──────────────────────────────────────────────────────────────
 
 export default async function OrchestratorPage() {
-  const [runs, lmReports, insight] = await Promise.all([
+  const [runs, lmReports, insight, pendingJobs] = await Promise.all([
     listOrchestratorRuns(),
     loadLMReports(1),
     Promise.race([
       generateOrquestradorInsight(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
     ]),
+    loadPendingJobs(),
   ]);
 
   const latestLM = lmReports?.[0] ?? null;
@@ -170,6 +206,61 @@ export default async function OrchestratorPage() {
 
       {/* Contextual AI Insight Panel */}
       {insight && <InsightPanel insight={insight} />}
+
+      {/* Pending Jobs — awaiting approval */}
+      {pendingJobs.length > 0 && (
+        <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-card-foreground shadow-sm p-6">
+          <div className="flex items-center gap-2 pb-4">
+            <span className="text-base">⏳</span>
+            <h3 className="text-lg font-semibold leading-none tracking-tight">
+              Aguardando aprovação
+            </h3>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300 ml-1">
+              {pendingJobs.length}
+            </span>
+          </div>
+          <div className="w-full overflow-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Tipo</th>
+                  <th className="px-4 py-3 font-medium">Resumo</th>
+                  <th className="px-4 py-3 font-medium">Criado</th>
+                  <th className="px-4 py-3 font-medium text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingJobs.map((job) => (
+                  <tr key={job.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {job.type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs max-w-[240px] truncate">
+                      {typeof job.payload?.headline === "string"
+                        ? job.payload.headline
+                        : typeof job.payload?.description === "string"
+                        ? job.payload.description
+                        : JSON.stringify(job.payload).slice(0, 80)}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDistanceToNow(new Date(job.created_at), { addSuffix: true, locale: ptBR })}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <ApproveJobButton
+                        jobId={job.id}
+                        jobType={job.type}
+                        approveAction={approveOrquestradorJob}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4">
         <div className="rounded-md border bg-card text-card-foreground shadow-sm p-6">

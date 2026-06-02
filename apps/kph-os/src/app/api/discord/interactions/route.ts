@@ -96,6 +96,24 @@ export async function POST(req: NextRequest) {
     const decision = commandName === 'aprovar' ? 'approve' : ('reject' as const)
     const result = await submitRunDecisionFromDiscord(runId, decision, discordUser)
 
+    // Also attempt post-approval action for orquestrador_jobs (fire-and-forget)
+    if (decision === 'approve' && process.env.KPH_API_SECRET) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://kph-os.vercel.app'
+      fetch(`${baseUrl}/api/orquestrador/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_id: runId,
+          secret: process.env.KPH_API_SECRET,
+        }),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json() as { action_taken?: string; message?: string }
+          console.log(`[discord/aprovar] post-approval action: ${data.action_taken} — ${data.message}`)
+        }
+      }).catch(() => {/* silencioso — orquestrador_job não encontrado é caso normal */})
+    }
+
     if (!result.ok) {
       return json({
         type: CHANNEL_MESSAGE_WITH_SOURCE,
