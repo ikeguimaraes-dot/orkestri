@@ -44,7 +44,7 @@ async function loadPendingJobs(): Promise<OrquestradorJob[]> {
     const { data } = await (supabase as any)
       .from("orquestrador_jobs")
       .select("id, type, status, payload, created_at")
-      .in("status", ["pending", "waiting_approval", "awaiting_approval"])
+      .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(20);
     return (data ?? []) as OrquestradorJob[];

@@ -240,12 +240,14 @@ async function handleAlertApproval(job: {
   const description = job.payload?.description ?? 'Alerta reconhecido'
   const severity = job.payload?.severity ?? 'warning'
 
-  // Map to kph_alerts actual schema
+  // Map to kph_alerts actual schema — prioridade uses P0/P1/P2/P3
+  const prioridade = severity === 'critical' ? 'P0' : severity === 'warning' ? 'P1' : 'P2'
+
   const { error } = await (supabase as any)
     .from('kph_alerts')
     .insert({
       tipo: 'alerta',
-      prioridade: severity === 'critical' ? 'alta' : 'media',
+      prioridade,
       mensagem: description,
       entidade: brandName,
       canal: 'orquestrador',

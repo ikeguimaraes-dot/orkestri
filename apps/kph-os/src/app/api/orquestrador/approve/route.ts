@@ -36,21 +36,30 @@ export async function POST(request: Request) {
   }
 
   const currentStatus = (job as any).status
-  if (!['pending', 'waiting_approval', 'awaiting_approval'].includes(currentStatus)) {
+  if (currentStatus !== 'pending') {
     return NextResponse.json(
       { error: `Job já processado (status atual: ${currentStatus})` },
       { status: 409 }
     )
   }
 
-  // Mark as approved
+  // Mark as running before executing
   await (supabase as any)
     .from('orquestrador_jobs')
-    .update({ status: 'approved', updated_at: new Date().toISOString() })
+    .update({ status: 'running', updated_at: new Date().toISOString() })
     .eq('id', jobId)
 
   // Execute post-approval action
   const result = await handleApproval(jobId)
+
+  // Update final status — success or error
+  await (supabase as any)
+    .from('orquestrador_jobs')
+    .update({
+      status: result.success ? 'success' : 'error',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', jobId)
 
   return NextResponse.json({
     success: result.success,
