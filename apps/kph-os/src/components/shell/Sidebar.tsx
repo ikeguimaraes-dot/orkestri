@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NAV_CONFIG, type NavGroupConfig, type NavItemConfig } from "@/lib/nav-config";
 import {
   // shell
   ChevronDown, ChevronRight, Check, LogOut,
@@ -60,17 +61,7 @@ type NavGroup = {
   defaultOpen: boolean;
 };
 
-// ── Tipos da API ─────────────────────────────────────────────
-type ApiNavItem = { href?: string; label: string; icon: string; defaultOpen?: boolean; children?: ApiNavItem[] };
-type ApiNavGroup = {
-  id: string;
-  label: string | null;
-  icon: string | null;
-  defaultOpen: boolean;
-  items: ApiNavItem[];
-};
-
-function resolveNavItem(it: ApiNavItem): NavItem {
+function resolveNavItem(it: NavItemConfig): NavItem {
   return {
     href: it.href,
     label: it.label,
@@ -80,7 +71,7 @@ function resolveNavItem(it: ApiNavItem): NavItem {
   };
 }
 
-function resolveGroups(raw: ApiNavGroup[]): NavGroup[] {
+function resolveGroups(raw: NavGroupConfig[]): NavGroup[] {
   return raw.map((g) => ({
     id: g.id,
     title: g.label,
@@ -90,16 +81,7 @@ function resolveGroups(raw: ApiNavGroup[]): NavGroup[] {
   }));
 }
 
-// ── Fallback mínimo usado se o fetch falhar ───────────────────
-const FALLBACK_GROUPS: NavGroup[] = [
-  {
-    id: "home",
-    title: null,
-    icon: null,
-    defaultOpen: true,
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
-  },
-];
+const NAV_GROUPS: NavGroup[] = resolveGroups(NAV_CONFIG);
 
 const STORAGE_KEY = "kph_sidebar_groups";
 
@@ -110,14 +92,6 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [navGroups, setNavGroups] = useState<NavGroup[] | null>(null);
-
-  useEffect(() => {
-    fetch("/api/nav")
-      .then((r) => r.json())
-      .then((d: { groups: ApiNavGroup[] }) => setNavGroups(resolveGroups(d.groups)))
-      .catch(() => setNavGroups(FALLBACK_GROUPS));
-  }, []);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -248,11 +222,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        {navGroups === null ? (
-          <NavSkeleton />
-        ) : (
-          <SidebarNav pathname={pathname} groups={navGroups} />
-        )}
+        <SidebarNav pathname={pathname} groups={NAV_GROUPS} />
 
         <div
           style={{
@@ -306,25 +276,6 @@ export function Sidebar() {
         </div>
       </aside>
     </>
-  );
-}
-
-// ── Skeleton de carregamento ──────────────────────────────────
-function NavSkeleton() {
-  return (
-    <nav style={{ flex: 1, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-      {[80, 60, 70, 65, 75].map((w, i) => (
-        <div
-          key={i}
-          style={{
-            height: 32, borderRadius: 8,
-            background: "var(--surface-2)",
-            width: `${w}%`,
-            opacity: 0.5,
-          }}
-        />
-      ))}
-    </nav>
   );
 }
 
