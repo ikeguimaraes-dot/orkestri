@@ -14,6 +14,8 @@ import {
   ShoppingCart, Package, Truck, Building2, FileText, PackageCheck, PieChart, Star, Carrot,
   // financeiro
   Wallet, Gauge, ArrowLeftRight, Sheet, CreditCard, Banknote, CheckSquare, RefreshCw, PiggyBank,
+  // financeiro DRE submenu
+  Zap, Settings, Wrench, Landmark, BadgeDollarSign,
   // pessoas
   Users, User, Briefcase, CalendarDays, Clock, Plane, CalendarX2, Timer,
   ShieldAlert, Receipt, DollarSign, Bus, GraduationCap, ClipboardCheck,
@@ -28,7 +30,28 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useAuth, useUnit } from "@kph/auth/context";
 
-type NavItem = { href: string; label: string; icon: LucideIcon };
+// ── Icon map: nome string → componente Lucide ─────────────────
+const ICON_MAP: Record<string, LucideIcon> = {
+  LayoutDashboard, TrendingUp, MapPin, Activity, UserCheck, ClipboardList, BookOpen,
+  ShoppingCart, Package, Truck, Building2, FileText, PackageCheck, PieChart, Star, Carrot,
+  Wallet, Gauge, ArrowLeftRight, Sheet, CreditCard, Banknote, CheckSquare, RefreshCw, PiggyBank,
+  Zap, Settings, Wrench, Landmark, BadgeDollarSign,
+  Users, User, Briefcase, CalendarDays, Clock, Plane, CalendarX2, Timer,
+  ShieldAlert, Receipt, DollarSign, Bus, GraduationCap, ClipboardCheck,
+  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks,
+  CalendarClock, Network, UserPlus, BarChart2,
+  Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
+  Bookmark, Info, Globe, Award,
+  Brain, Target, LineChart, Layers, Bug, Map, BarChart3, Workflow,
+};
+
+function resolveIcon(name: string | null): LucideIcon | null {
+  if (!name) return null;
+  return ICON_MAP[name] ?? null;
+}
+
+// ── Tipos internos (ícones resolvidos) ───────────────────────
+type NavItem = { href?: string; label: string; icon: LucideIcon; children?: NavItem[] };
 type NavGroup = {
   id: string;
   title: string | null;
@@ -37,143 +60,45 @@ type NavGroup = {
   defaultOpen: boolean;
 };
 
-const NAV_GROUPS: NavGroup[] = [
+// ── Tipos da API ─────────────────────────────────────────────
+type ApiNavItem = { href?: string; label: string; icon: string; children?: ApiNavItem[] };
+type ApiNavGroup = {
+  id: string;
+  label: string | null;
+  icon: string | null;
+  defaultOpen: boolean;
+  items: ApiNavItem[];
+};
+
+function resolveNavItem(it: ApiNavItem): NavItem {
+  return {
+    href: it.href,
+    label: it.label,
+    icon: resolveIcon(it.icon) ?? LayoutDashboard,
+    children: it.children ? it.children.map(resolveNavItem) : undefined,
+  };
+}
+
+function resolveGroups(raw: ApiNavGroup[]): NavGroup[] {
+  return raw.map((g) => ({
+    id: g.id,
+    title: g.label,
+    icon: resolveIcon(g.icon),
+    defaultOpen: g.defaultOpen,
+    items: g.items.map(resolveNavItem),
+  }));
+}
+
+// ── Fallback mínimo usado se o fetch falhar ───────────────────
+const FALLBACK_GROUPS: NavGroup[] = [
   {
     id: "home",
     title: null,
     icon: null,
     defaultOpen: true,
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    ],
-  },
-  {
-    id: "operacao",
-    title: "Operação",
-    icon: TrendingUp,
-    defaultOpen: false,
-    items: [
-      { href: "/operacao/mapa",          label: "Mapa da Casa",  icon: MapPin },
-      { href: "/operacao/performance",   label: "Performance",   icon: Activity },
-      { href: "/operacao/vendedores",    label: "Vendedores",    icon: UserCheck },
-      { href: "/operacao/auditorias",    label: "Auditorias",    icon: ClipboardList },
-    ],
-  },
-  {
-    id: "compras",
-    title: "Compras",
-    icon: ShoppingCart,
-    defaultOpen: false,
-    items: [
-      { href: "/cardapio",               label: "Cardápio",      icon: BookOpen },
-      { href: "/compras/ingredientes",   label: "Ingredientes",      icon: Carrot },
-      { href: "/compras",                label: "Pedidos",           icon: ShoppingCart },
-      { href: "/compras/estoque",        label: "Estoque",           icon: Package },
-      { href: "/compras/logistica",      label: "Logística",         icon: Truck },
-      { href: "/compras/fornecedores",   label: "Fornecedores",      icon: Building2 },
-      { href: "/compras/cotacoes",       label: "Cotações",          icon: FileText },
-      { href: "/compras/recebimento",    label: "Recebimento",       icon: PackageCheck },
-      { href: "/compras/analise",        label: "Análise CMV",       icon: PieChart },
-      { href: "/compras/feedback",       label: "Feedback Produto",  icon: Star },
-    ],
-  },
-  {
-    id: "financeiro",
-    title: "Financeiro",
-    icon: Wallet,
-    defaultOpen: false,
-    items: [
-      { href: "/financeiro",              label: "Cockpit",           icon: Gauge },
-      { href: "/financeiro/fluxo",        label: "Fluxo de Caixa",   icon: ArrowLeftRight },
-      { href: "/financeiro/dre",          label: "DRE",               icon: Sheet },
-      { href: "/financeiro/produtos",     label: "Relatório de Produtos", icon: Package },
-      { href: "/financeiro/pagar",        label: "Contas a Pagar",   icon: CreditCard },
-      { href: "/financeiro/receber",      label: "Contas a Receber", icon: Banknote },
-      { href: "/financeiro/aprovacoes",   label: "Aprovações",        icon: CheckSquare },
-      { href: "/financeiro/conciliacao",  label: "Conciliação",       icon: RefreshCw },
-      { href: "/financeiro/orcamento",    label: "Orçamento",         icon: PiggyBank },
-    ],
-  },
-  {
-    id: "pessoas",
-    title: "Pessoas",
-    icon: Users,
-    defaultOpen: true,
-    items: [
-      { href: "/pessoas/headcount",       label: "Headcount",         icon: BarChart3 },
-      { href: "/pessoas/colaboradores",   label: "Colaboradores",     icon: User },
-      { href: "/recrutamento/vagas",      label: "Recrutamento",      icon: Briefcase },
-      { href: "/pessoas/escala",          label: "Escala",            icon: CalendarDays },
-      { href: "/pessoas/ponto",           label: "Ponto",             icon: Clock },
-      { href: "/pessoas/ferias",          label: "Férias",            icon: Plane },
-      { href: "/pessoas/faltas",          label: "Faltas",            icon: CalendarX2 },
-      { href: "/pessoas/horas-extras",    label: "Horas Extras",      icon: Timer },
-      { href: "/pessoas/disciplina",      label: "Disciplina & Score", icon: ShieldAlert },
-      { href: "/pessoas/holerites",       label: "Holerites",         icon: Receipt },
-      { href: "/pessoas/gorjetas",        label: "Gorjetas",          icon: DollarSign },
-      { href: "/pessoas/vale-transporte", label: "Vale Transporte",   icon: Bus },
-      { href: "/pessoas/treinamentos",    label: "Treinamentos",      icon: GraduationCap },
-      { href: "/pessoas/avaliacoes",        label: "Avaliações",        icon: ClipboardCheck },
-      { href: "/pessoas/avaliacoes/ciclos", label: "Ciclos 360°",     icon: Repeat2 },
-      { href: "/pessoas/avaliacoes/9box",   label: "Matriz 9Box",     icon: LayoutGrid },
-      { href: "/pessoas/pdi",               label: "PDI",             icon: ListChecks },
-      { href: "/pessoas/analytics",         label: "Analytics",       icon: BarChart2 },
-      { href: "/pessoas/reunioes",          label: "Reuniões 1:1",    icon: CalendarClock },
-      { href: "/pessoas/organograma",       label: "Organograma",     icon: Network },
-      { href: "/pessoas/onboarding",        label: "Onboarding",      icon: UserPlus },
-      { href: "/pessoas/feedback",          label: "Feedback",        icon: MessageCircle },
-      { href: "/pessoas/documentos",      label: "Documentos",        icon: FolderOpen },
-      { href: "/pessoas/importacao",      label: "Importar Dados",    icon: Upload },
-      { href: "/pessoas/relatorio-ponto", label: "Relatório de Ponto", icon: FileBarChart2 },
-    ],
-  },
-  {
-    id: "comercial",
-    title: "Comercial",
-    icon: Handshake,
-    defaultOpen: false,
-    items: [
-      { href: "/cliente",               label: "CRM Clientes", icon: MessageSquare },
-      { href: "/comercial/reservas",    label: "Reservas",     icon: CalendarCheck },
-      { href: "/eventos",               label: "Eventos / OS", icon: CalendarDays },
-      { href: "/comercial/serena",      label: "Serena",       icon: Bot },
-      { href: "/campanhas",             label: "Campanhas",    icon: Megaphone },
-      { href: "/comercial/funil",       label: "Funil",        icon: Filter },
-    ],
-  },
-  {
-    id: "marca",
-    title: "Marca",
-    icon: Bookmark,
-    defaultOpen: false,
-    items: [
-      { href: "/marcas",              label: "Diretório",    icon: Building2 },
-      { href: "/marca/brandbook",     label: "BrandBook",    icon: BookOpen },
-      { href: "/marca/quem-somos",    label: "Quem Somos",   icon: Info },
-      { href: "/marca/canais",        label: "Site & Canais", icon: Globe },
-      { href: "/marca/reputacao",     label: "Reputação",    icon: Award },
-    ],
-  },
-  {
-    id: "inteligencia",
-    title: "Inteligência",
-    icon: Brain,
-    defaultOpen: false,
-    items: [
-      { href: "/inteligencia/metas",    label: "Metas",          icon: Target },
-      { href: "/inteligencia/wbr",      label: "WBR",            icon: LineChart },
-      { href: "/inteligencia/cross",    label: "Cross-módulo",   icon: Layers },
-      { href: "/inteligencia/adocao",   label: "Adoção",         icon: Activity },
-      { href: "/inteligencia/feedback", label: "Bugs & Feedback", icon: Bug },
-      { href: "/inteligencia/roadmap",  label: "Roadmap",        icon: Map },
-      { href: "/orquestrador",          label: "Orquestrador",   icon: Workflow },
-    ],
+    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
 ];
-
-const ALL_NAV_ITEMS: { href: string; groupId: string }[] = NAV_GROUPS.flatMap(
-  (g) => g.items.map((it) => ({ href: it.href, groupId: g.id })),
-);
 
 const STORAGE_KEY = "kph_sidebar_groups";
 
@@ -184,6 +109,14 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [navGroups, setNavGroups] = useState<NavGroup[] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/nav")
+      .then((r) => r.json())
+      .then((d: { groups: ApiNavGroup[] }) => setNavGroups(resolveGroups(d.groups)))
+      .catch(() => setNavGroups(FALLBACK_GROUPS));
+  }, []);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -314,7 +247,11 @@ export function Sidebar() {
           </div>
         </div>
 
-        <SidebarNav pathname={pathname} />
+        {navGroups === null ? (
+          <NavSkeleton />
+        ) : (
+          <SidebarNav pathname={pathname} groups={navGroups} />
+        )}
 
         <div
           style={{
@@ -371,12 +308,45 @@ export function Sidebar() {
   );
 }
 
-// ── Sub: nav com grupos colapsáveis ────────────────────────────
-function SidebarNav({ pathname }: { pathname: string }) {
+// ── Skeleton de carregamento ──────────────────────────────────
+function NavSkeleton() {
+  return (
+    <nav style={{ flex: 1, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      {[80, 60, 70, 65, 75].map((w, i) => (
+        <div
+          key={i}
+          style={{
+            height: 32, borderRadius: 8,
+            background: "var(--surface-2)",
+            width: `${w}%`,
+            opacity: 0.5,
+          }}
+        />
+      ))}
+    </nav>
+  );
+}
+
+// ── Sub: nav com grupos colapsáveis ──────────────────────────
+function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[] }) {
+  const allItems = useMemo(
+    () =>
+      groups.flatMap((g) =>
+        g.items.flatMap((it) => {
+          const base = it.href ? [{ href: it.href, groupId: g.id }] : [];
+          const childItems = (it.children ?? []).flatMap((c) =>
+            c.href ? [{ href: c.href, groupId: g.id }] : [],
+          );
+          return [...base, ...childItems];
+        }),
+      ),
+    [groups],
+  );
+
   const activeHref = useMemo(() => {
     let bestHref: string | null = null;
     let bestLen = -1;
-    for (const it of ALL_NAV_ITEMS) {
+    for (const it of allItems) {
       const matches = pathname === it.href || pathname.startsWith(it.href + "/");
       if (matches && it.href.length > bestLen) {
         bestHref = it.href;
@@ -384,18 +354,19 @@ function SidebarNav({ pathname }: { pathname: string }) {
       }
     }
     return bestHref;
-  }, [pathname]);
+  }, [pathname, allItems]);
 
   const activeGroupId = useMemo(() => {
     if (!activeHref) return null;
-    return ALL_NAV_ITEMS.find((it) => it.href === activeHref)?.groupId ?? null;
-  }, [activeHref]);
+    return allItems.find((it) => it.href === activeHref)?.groupId ?? null;
+  }, [activeHref, allItems]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const m: Record<string, boolean> = {};
-    for (const g of NAV_GROUPS) m[g.id] = g.defaultOpen;
+    for (const g of groups) m[g.id] = g.defaultOpen;
     return m;
   });
+  const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -418,6 +389,18 @@ function SidebarNav({ pathname }: { pathname: string }) {
     setOpenMap((prev) => (prev[activeGroupId] ? prev : { ...prev, [activeGroupId]: true }));
   }, [activeGroupId]);
 
+  // Auto-abre o item pai quando um filho está ativo
+  useEffect(() => {
+    if (!activeHref) return;
+    for (const g of groups) {
+      for (const it of g.items) {
+        if (it.children?.some((c) => c.href === activeHref)) {
+          setOpenItems((prev) => (prev[it.label] ? prev : { ...prev, [it.label]: true }));
+        }
+      }
+    }
+  }, [activeHref, groups]);
+
   function toggleGroup(id: string) {
     setOpenMap((prev) => {
       const next = { ...prev, [id]: !prev[id] };
@@ -432,6 +415,10 @@ function SidebarNav({ pathname }: { pathname: string }) {
     });
   }
 
+  function toggleItem(label: string) {
+    setOpenItems((prev) => ({ ...prev, [label]: !prev[label] }));
+  }
+
   return (
     <nav
       style={{
@@ -443,7 +430,7 @@ function SidebarNav({ pathname }: { pathname: string }) {
         overflowY: "auto",
       }}
     >
-      {NAV_GROUPS.map((g) => {
+      {groups.map((g) => {
         const isOpen = openMap[g.id] ?? g.defaultOpen;
         return (
           <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -486,11 +473,115 @@ function SidebarNav({ pathname }: { pathname: string }) {
             {isOpen &&
               g.items.map((it) => {
                 const Icon = it.icon;
+
+                if (it.children) {
+                  const itemOpen = openItems[it.label] ?? false;
+                  const childActive = it.children.some((c) => c.href === activeHref);
+                  return (
+                    <div key={it.label}>
+                      <button
+                        type="button"
+                        onClick={() => toggleItem(it.label)}
+                        style={{
+                          position: "relative",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "9px 12px",
+                          borderRadius: 8,
+                          width: "100%",
+                          background: childActive && !itemOpen ? "var(--surface-2)" : "transparent",
+                          border: "none",
+                          color: childActive ? "var(--text)" : "var(--text-2)",
+                          fontSize: 13,
+                          fontWeight: childActive ? 600 : 500,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all var(--t)",
+                        }}
+                      >
+                        {childActive && !itemOpen && (
+                          <span
+                            style={{
+                              position: "absolute",
+                              left: -12,
+                              top: 6,
+                              bottom: 6,
+                              width: 3,
+                              background: "var(--brand)",
+                              borderRadius: "0 4px 4px 0",
+                            }}
+                          />
+                        )}
+                        <Icon
+                          size={16}
+                          strokeWidth={childActive ? 2.2 : 1.8}
+                          style={{ color: childActive ? "var(--brand)" : "currentColor" }}
+                        />
+                        <span style={{ flex: 1 }}>{it.label}</span>
+                        <ChevronRight
+                          size={12}
+                          style={{
+                            color: "var(--text-3)",
+                            transform: itemOpen ? "rotate(90deg)" : "none",
+                            transition: hydrated ? "transform var(--t)" : "none",
+                          }}
+                        />
+                      </button>
+                      {itemOpen &&
+                        it.children.map((child) => {
+                          const ChildIcon = child.icon;
+                          const childIsActive = child.href === activeHref;
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href!}
+                              style={{
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                padding: "7px 12px 7px 28px",
+                                borderRadius: 8,
+                                textDecoration: "none",
+                                color: childIsActive ? "var(--text)" : "var(--text-2)",
+                                background: childIsActive ? "var(--surface-2)" : "transparent",
+                                fontSize: 12,
+                                fontWeight: childIsActive ? 600 : 400,
+                                transition: "all var(--t)",
+                              }}
+                            >
+                              {childIsActive && (
+                                <span
+                                  style={{
+                                    position: "absolute",
+                                    left: -12,
+                                    top: 4,
+                                    bottom: 4,
+                                    width: 3,
+                                    background: "var(--brand)",
+                                    borderRadius: "0 4px 4px 0",
+                                  }}
+                                />
+                              )}
+                              <ChildIcon
+                                size={14}
+                                strokeWidth={childIsActive ? 2.2 : 1.8}
+                                style={{ color: childIsActive ? "var(--brand)" : "currentColor" }}
+                              />
+                              <span style={{ flex: 1 }}>{child.label}</span>
+                            </Link>
+                          );
+                        })}
+                    </div>
+                  );
+                }
+
                 const active = it.href === activeHref;
                 return (
                   <Link
                     key={it.href}
-                    href={it.href}
+                    href={it.href!}
                     style={{
                       position: "relative",
                       display: "flex",
