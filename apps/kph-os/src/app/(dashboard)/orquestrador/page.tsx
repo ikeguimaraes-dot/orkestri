@@ -4,39 +4,63 @@ import { handleApproval } from "@/lib/orquestrador/approve-handler";
 import { createServiceClient } from "@kph/db/supabase/server";
 import type { LMReport } from "@/lib/orquestrador/learning-machine";
 
+// Label map — cobre todos os módulos planejados; fallback capitaliza o slug
+const MODULE_LABELS: Record<string, string> = {
+  pessoas:    "Pessoas",
+  operacao:   "Operação",
+  financeiro: "Financeiro",
+  comercial:  "Comercial",
+  compras:    "Compras",
+  marca:      "Marca",
+};
+
+function moduleLabel(slug: string): string {
+  return MODULE_LABELS[slug] ?? slug.charAt(0).toUpperCase() + slug.slice(1);
+}
+
 type ModuleScore = { modulo: string; score: number | null; insight_text: string | null; semana: string | null };
 
+/**
+ * Carrega o último insight por módulo direto de kph_insights.
+ * Abordagem dinâmica: busca os N registros mais recentes e deduplica por modulo.
+ * Qualquer módulo novo aparece automaticamente ao gravar o primeiro insight — sem
+ * mexer neste código.
+ */
 async function loadModuleScores(): Promise<ModuleScore[]> {
   try {
     const supabase = createServiceClient();
     if (!supabase) return [];
-    const modules = ["pessoas"];
+
+    // Busca os 100 registros mais recentes — suficiente para cobrir todos os módulos
+    const { data, error } = await (supabase as any)
+      .from("kph_insights")
+      .select("modulo, insight_text, semana, dados_referencia, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error || !data) return [];
+
+    // Deduplica: mantém apenas a linha mais recente por modulo
+    const seen = new Set<string>();
     const results: ModuleScore[] = [];
-    for (const mod of modules) {
-      // Score vem de kph_intelligence_scores (coluna dedicada, não JSONB aninhado)
-      const { data: scoreRow } = await (supabase as any)
-        .from("kph_intelligence_scores")
-        .select("modulo, score, semana")
-        .eq("modulo", mod)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      // Insight textual vem de kph_insights
-      const { data: insightRow } = await (supabase as any)
-        .from("kph_insights")
-        .select("insight_text")
-        .eq("modulo", mod)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    for (const row of data as Array<{
+      modulo: string;
+      insight_text: string | null;
+      semana: string | null;
+      dados_referencia: { score?: number } | null;
+    }>) {
+      if (seen.has(row.modulo)) continue;
+      seen.add(row.modulo);
       results.push({
-        modulo: mod,
-        score: (scoreRow as any)?.score ?? null,
-        insight_text: (insightRow as any)?.insight_text ?? null,
-        semana: (scoreRow as any)?.semana ?? null,
+        modulo: row.modulo,
+        score: row.dados_referencia?.score ?? null,
+        insight_text: row.insight_text,
+        semana: row.semana,
       });
     }
-    return results;
+
+    // Ordena: módulos com score primeiro (desc), depois sem score
+    return results.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
   } catch {
     return [];
   }
@@ -135,11 +159,10 @@ export default async function OrchestratorPage() {
                 m.score >= 80 ? "text-yellow-600 dark:text-yellow-400" :
                 m.score >= 60 ? "text-amber-600 dark:text-amber-400" :
                 "text-red-600 dark:text-red-400";
-              const moduloLabel: Record<string, string> = { pessoas: "Pessoas" };
               return (
                 <div key={m.modulo} className="rounded-md bg-muted/40 p-3 border border-border/60">
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                    {moduloLabel[m.modulo] ?? m.modulo}
+                    {moduleLabel(m.modulo)}
                   </div>
                   <div className={`text-3xl font-bold tabular-nums ${scoreColor}`}>
                     {m.score ?? "—"}
