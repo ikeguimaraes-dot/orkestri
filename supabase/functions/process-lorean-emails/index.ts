@@ -279,7 +279,8 @@ async function parsePdfWithClaude(
   }
 
   const raw = textBlock.text;
-  console.log(`[lorean] Raw text for ${filename} (first 600 chars): ${raw.slice(0, 600)}`);
+  const logLen = tipo === "venda" ? 3000 : 600;
+  console.log(`[lorean] Raw text for ${filename} (first ${logLen} chars): ${raw.slice(0, logLen)}`);
 
   // Guard: catch the case where Claude output is not JSON at all
   const clean = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
@@ -493,6 +494,8 @@ async function insertVenda(
   console.log("[venda] horarios:", parsed.horarios?.length ?? 0);
   console.log("[venda] usuarios:", parsed.usuarios?.length ?? 0);
   console.log("[venda] JSON keys from Claude:", Object.keys(parsed).join(", "));
+  console.log("[venda] horarios sample:", JSON.stringify(parsed.horarios?.slice(0, 2)));
+  console.log("[venda] usuarios sample:", JSON.stringify(parsed.usuarios?.slice(0, 2)));
 
   const inserts: Promise<any>[] = [];
   if (parsed.grupos?.length)        inserts.push(supabase.from("lorean_grupos").insert(parsed.grupos.map((r: any) => ({ ...r, workday_id_fk: wd.id }))));
