@@ -312,6 +312,22 @@ function classifyTurno(aberturaAt: string | null | undefined): "almoco" | "janta
   return hora >= 10 && hora < 17 ? "almoco" : "jantar";
 }
 
+const MONTHS_PT: Record<string, string> = {
+  JAN: "01", FEV: "02", MAR: "03", ABR: "04", MAI: "05", JUN: "06",
+  JUL: "07", AGO: "08", SET: "09", OUT: "10", NOV: "11", DEZ: "12",
+};
+
+function extractTimestamps(pdfText: string): { abertura_at: string | null; fechamento_at: string | null } {
+  const re = /[A-ZÁÉÍÓÚÃÕÊ]{3},\s+(\d{2})\s+([A-Z]{3})\s+(\d{4})\s+(\d{2}:\d{2})/g;
+  const matches: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(pdfText)) !== null && matches.length < 2) {
+    const mm = MONTHS_PT[m[2]!];
+    if (mm) matches.push(`${m[3]}-${mm}-${m[1]} ${m[4]}:00`);
+  }
+  return { abertura_at: matches[0] ?? null, fechamento_at: matches[1] ?? null };
+}
+
 async function insertWorkday(
   parsed: any,
   unitId: string,
@@ -599,6 +615,13 @@ async function processAttachment(
     }
 
     if (tipo === "workday") {
+      // Extract abertura_at / fechamento_at via regex — more reliable than Claude for this field
+      const pdfBytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
+      const pdfText = new TextDecoder("latin1").decode(pdfBytes);
+      const { abertura_at, fechamento_at } = extractTimestamps(pdfText);
+      if (abertura_at !== null) { parsed.abertura_at = abertura_at; }
+      if (fechamento_at !== null) { parsed.fechamento_at = fechamento_at; }
+      console.log(`[lorean] timestamps from regex: abertura=${abertura_at} fechamento=${fechamento_at}`);
       await insertWorkday(parsed, supabaseUnitId, emailId, filename);
     } else {
       await insertCaixa(parsed, supabaseUnitId, emailId, filename);
