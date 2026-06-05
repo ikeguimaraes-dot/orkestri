@@ -305,7 +305,8 @@ async function parsePdfWithClaude(
 
 // ── Database insertion ──────────────────────────────────────────────────────
 
-function classifyTurno(aberturaAt: string): "almoco" | "jantar" {
+function classifyTurno(aberturaAt: string | null | undefined): "almoco" | "jantar" | "dia_inteiro" {
+  if (!aberturaAt) return "dia_inteiro";
   const hora = new Date(aberturaAt).getHours();
   return hora >= 10 && hora < 17 ? "almoco" : "jantar";
 }
@@ -318,25 +319,8 @@ async function insertWorkday(
 ) {
   console.log(`[lorean] insertWorkday: data=${parsed.data} unit=${unitId}`);
 
-  const { data: existing } = await supabase
-    .from("lorean_workdays")
-    .select("id, turno, abertura_at")
-    .eq("unit_id", unitId)
-    .eq("data", parsed.data)
-    .maybeSingle();
-
-  let turno: string = "dia_inteiro";
-
-  if (existing) {
-    const turnoExistente = classifyTurno(existing.abertura_at);
-    console.log(`[lorean] Existing workday found (${existing.id}), reclassifying to turno=${turnoExistente}`);
-    await supabase
-      .from("lorean_workdays")
-      .update({ turno: turnoExistente })
-      .eq("id", existing.id);
-    turno = classifyTurno(parsed.abertura_at);
-    console.log(`[lorean] New workday turno=${turno}`);
-  }
+  const turno = classifyTurno(parsed.abertura_at);
+  console.log(`[lorean] turno=${turno} (abertura_at=${parsed.abertura_at})`);
 
   const { data: wd, error: wdErr } = await supabase
     .from("lorean_workdays")
