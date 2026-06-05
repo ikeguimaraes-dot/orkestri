@@ -396,7 +396,7 @@ async function insertCaixa(
 }
 
 async function logError(emailId: string, filename: string, err: unknown) {
-  const tipo = filename.includes("Movimento") ? "workday" : "caixa";
+  const tipo = filename.includes("Movimento") ? "workday" : filename.includes("Caixa") ? "caixa" : "venda";
   const errMsg = String(err);
   console.error(`[lorean] ERROR processing ${filename}:`, errMsg);
   await supabase.from("lorean_import_log").insert({
@@ -418,7 +418,8 @@ async function processAttachment(
   const { filename, attachmentId } = attachment;
   console.log(`[lorean] Processing attachment: ${filename}`);
 
-  const unitMatch = filename.match(/LOREAN__(\d+)__/i);
+  // Accepts both "LOREAN [2031]" and "LOREAN__2031__" formats
+  const unitMatch = filename.match(/LOREAN\s*[\[\(]?(\d+)[\]\)]?/i);
   const loreanUnitId = unitMatch?.[1];
   const unitMap: Record<string, string> = JSON.parse(
     Deno.env.get("LOREAN_UNIT_MAP") ?? "{}",
@@ -427,14 +428,24 @@ async function processAttachment(
   console.log(`[lorean] Unit: lorean=${loreanUnitId} → supabase=${supabaseUnitId ?? "NOT FOUND"}`);
 
   if (!supabaseUnitId) {
-    throw new Error(`Unidade Lorean desconhecida: ${loreanUnitId ?? "?"} em ${filename}. LOREAN_UNIT_MAP=${Deno.env.get("LOREAN_UNIT_MAP")}`);
+    throw new Error(`Unidade Lorean desconhecida: ${loreanUnitId ?? "?"} em "${filename}". LOREAN_UNIT_MAP=${Deno.env.get("LOREAN_UNIT_MAP")}`);
+  }
+
+  // Detect PDF type — skip "Venda" (not yet handled)
+  const tipo: "workday" | "caixa" | "venda" = filename.includes("Movimento")
+    ? "workday"
+    : filename.includes("Caixa")
+    ? "caixa"
+    : "venda";
+
+  if (tipo === "venda") {
+    console.log(`[lorean] Skipping "Venda" PDF (not implemented): ${filename}`);
+    return;
   }
 
   console.log(`[lorean] Downloading PDF attachment ${attachmentId}...`);
   const pdfBase64 = await getAttachmentBase64(accessToken, emailId, attachmentId);
   console.log(`[lorean] PDF downloaded, base64 length=${pdfBase64.length}`);
-
-  const tipo: "workday" | "caixa" = filename.includes("Movimento") ? "workday" : "caixa";
   const parsed = await parsePdfWithClaude(pdfBase64, tipo, filename);
 
   if (tipo === "workday") {
