@@ -305,7 +305,7 @@ async function parsePdfWithClaude(
   }
 
   const raw = textBlock.text;
-  console.log(`[lorean] Raw text for ${filename} (first 400 chars): ${raw.slice(0, 400)}`);
+  console.log(`[lorean] Raw text for ${filename} (first 600 chars): ${raw.slice(0, 600)}`);
 
   // Guard: catch the case where Claude output is not JSON at all
   const clean = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
@@ -542,6 +542,18 @@ async function insertVenda(
     supabase.from("lorean_cancelamentos").delete().eq("workday_id_fk", wdId),
   ]);
 
+  // Log counts BEFORE inserting — shows what Claude returned per field
+  console.log("[venda] pagamentos:", parsed.pagamentos?.length ?? 0);
+  console.log("[venda] ambientes:", parsed.ambientes?.length ?? 0);
+  console.log("[venda] turnos:", parsed.turnos?.length ?? 0);
+  console.log("[venda] horarios:", parsed.horarios?.length ?? 0);
+  console.log("[venda] grupos:", parsed.grupos?.length ?? 0);
+  console.log("[venda] descontos:", parsed.descontos?.length ?? 0);
+  console.log("[venda] cancelamentos:", parsed.cancelamentos?.length ?? 0);
+  console.log("[venda] usuarios:", parsed.usuarios?.length ?? 0);
+  // Log top-level keys so we can spot unexpected field names from Claude
+  console.log("[venda] JSON keys from Claude:", Object.keys(parsed).join(", "));
+
   const inserts: Promise<any>[] = [];
   const tag = (arr: any[], key: string) => (arr ?? []).map((r: any) => ({ ...r, workday_id_fk: wdId, [key]: r[key] }));
 
@@ -555,7 +567,7 @@ async function insertVenda(
   if (parsed.cancelamentos?.length) inserts.push(supabase.from("lorean_cancelamentos").insert(tag(parsed.cancelamentos, "motivo")));
 
   await Promise.all(inserts);
-  console.log(`[lorean] Venda child tables inserted: pagamentos=${parsed.pagamentos?.length ?? 0} ambientes=${parsed.ambientes?.length ?? 0} horarios=${parsed.horarios?.length ?? 0} usuarios=${parsed.usuarios?.length ?? 0} cancelamentos=${parsed.cancelamentos?.length ?? 0}`);
+  console.log("[venda] inserts dispatched");
 
   await supabase.from("lorean_import_log").insert({
     email_id: emailId,
