@@ -44,13 +44,14 @@ export async function POST(req: Request) {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://kph-os.vercel.app'
-  const emoji = passed ? '✅' : '⚠️'
-  const label = passed ? 'QA passou' : 'QA falhou — revisão necessária'
-  await sendDiscordMessage(
-    `${emoji} **${label}** — ${summary}\n` +
-      `**Preview:** ${preview_url}` +
-      (run ? `\n**Painel:** ${baseUrl}/orquestrador/${run.id}` : '')
-  )
+  const passed_label = passed ? 'QA passou' : 'QA falhou — revisão necessária'
+  await sendDiscordMessage('orquestrador', {
+    title: passed_label,
+    description:
+      `${summary}\n**Preview:** ${preview_url}` +
+      (run ? `\n**Painel:** ${baseUrl}/orquestrador/${run.id}` : ''),
+    color: passed ? 0x2ECC71 : 0xE74C3C,
+  })
 
   return NextResponse.json({ ok: true, passed, summary })
 }

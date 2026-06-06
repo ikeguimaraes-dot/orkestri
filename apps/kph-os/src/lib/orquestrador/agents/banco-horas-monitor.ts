@@ -108,10 +108,11 @@ export async function runBancoHorasMonitor(): Promise<{ created: number }> {
 
   if (created > 0) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://kph-os.vercel.app'
-    await sendDiscordMessage(
-      `🕐 **Banco de Horas Monitor** — ${created} colaborador(es) com saldo acima de ${thresholdHoras}h detectado(s).\n` +
-        `Acesse o painel para revisar: ${baseUrl}/orquestrador`
-    )
+    await sendDiscordMessage('orquestrador', {
+      title: 'Banco de Horas Monitor',
+      description: `${created} colaborador(es) com saldo acima de ${thresholdHoras}h detectado(s).\nAcesse o painel para revisar: ${baseUrl}/orquestrador`,
+      color: 0xF39C12,
+    })
   }
 
   return { created }

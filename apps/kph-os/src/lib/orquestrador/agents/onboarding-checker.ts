@@ -106,10 +106,11 @@ export async function runOnboardingChecker(): Promise<{ checked: number; pendenc
 
   if (pendencias > 0) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://kph-os.vercel.app'
-    await sendDiscordMessage(
-      `📋 **Onboarding Checker** — ${pendencias} colaborador(es) com documentos pendentes.\n` +
-        `Acesse o painel para revisar: ${baseUrl}/orquestrador`
-    )
+    await sendDiscordMessage('orquestrador', {
+      title: 'Onboarding Checker',
+      description: `${pendencias} colaborador(es) com documentos pendentes.\nAcesse o painel para revisar: ${baseUrl}/orquestrador`,
+      color: 0x9B59B6,
+    })
   }
 
   return { checked, pendencias }

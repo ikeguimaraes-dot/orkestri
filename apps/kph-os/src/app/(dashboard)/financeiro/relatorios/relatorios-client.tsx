@@ -27,12 +27,14 @@ function gerarCompetencias(): string[] {
 }
 
 function formatCompetencia(comp: string): string {
-  const [yyyy, mm] = comp.split("-");
+  const parts = comp.split("-");
+  const yyyy = parts[0] ?? "";
+  const mm = parts[1] ?? "01";
   const meses = [
     "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
     "Jul", "Ago", "Set", "Out", "Nov", "Dez",
   ];
-  return `${meses[parseInt(mm, 10) - 1]}/${yyyy}`;
+  return `${meses[parseInt(mm, 10) - 1] ?? mm}/${yyyy}`;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -48,7 +50,7 @@ export function RelatoriosClient({ relatorios }: { relatorios: PayrollReport[] }
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState(false);
-  const [competencia, setCompetencia] = useState(gerarCompetencias()[0]);
+  const [competencia, setCompetencia] = useState(gerarCompetencias()[0] ?? "");
   const [tipo, setTipo] = useState<TipoRelatorio>("folha_mensal");
   const fileRef = useRef<HTMLInputElement>(null);
 

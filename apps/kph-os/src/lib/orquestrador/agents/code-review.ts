@@ -72,15 +72,17 @@ Seja direto e construtivo. Responda em português brasileiro.`,
     await autoApproveRun(runId)
 
     // 5. Notifica Discord
-    await sendDiscordMessage(
-      `✅ **Code Review concluído** — PR #${pull_request.number}\n` +
-        `**PR:** ${pull_request.title}\n` +
-        `**Link:** ${pull_request.html_url}`
-    )
+    await sendDiscordMessage('orquestrador', {
+      title: `Code Review concluído — PR #${pull_request.number}`,
+      description: `**PR:** ${pull_request.title}\n**Link:** ${pull_request.html_url}`,
+      color: 0x2ECC71,
+    })
   } catch (err) {
     await markRunFailed(runId, String(err))
-    await sendDiscordMessage(
-      `❌ **Code Review falhou** — run \`${runId}\`\n${String(err)}`
-    )
+    await sendDiscordMessage('orquestrador', {
+      title: 'Code Review falhou',
+      description: `Run \`${runId}\`\n${String(err)}`,
+      color: 0xE74C3C,
+    })
   }
 }
