@@ -2,6 +2,7 @@ import { listOrchestratorRuns } from "@/lib/orquestrador/actions";
 import { loadLMReports, generateLearningMachineReport } from "@/lib/orquestrador/learning-machine";
 import { handleApproval } from "@/lib/orquestrador/approve-handler";
 import { createServiceClient } from "@kph/db/supabase/server";
+import { applyScoreCap, type ProposalRisk } from "@/lib/score-policy";
 import type { LMReport } from "@/lib/orquestrador/learning-machine";
 
 // Label map — cobre todos os módulos planejados; fallback capitaliza o slug
@@ -18,25 +19,31 @@ function moduleLabel(slug: string): string {
   return MODULE_LABELS[slug] ?? slug.charAt(0).toUpperCase() + slug.slice(1);
 }
 
-type ModuleScore = { modulo: string; score: number | null; insight_text: string | null; semana: string | null };
+type ModuleScore = {
+  modulo: string;
+  score: number | null;
+  score_oficial: number | null;
+  cap_razao: string | null;
+  insight_text: string | null;
+  semana: string | null;
+};
 
 type ScoreRow = { modulo: string; score: number | null; semana: string | null };
 type InsightRow = { modulo: string; insight_text: string | null };
 
 /**
- * Fonte de verdade dos scores: kph_intelligence_scores (coluna score integer + modulo).
- * Insight textual: kph_insights (coluna insight_text).
- * Abordagem dinâmica: busca N registros mais recentes de cada tabela e deduplica por
- * modulo em JS. Qualquer módulo novo aparece automaticamente.
+ * Carrega scores por módulo aplicando a política de teto do kernel.
+ *
+ * Fonte de verdade: kph_intelligence_scores (score bruto) + kph_learning_proposals (riscos).
+ * A política applyScoreCap() é determinística: ambos os painéis produzem o mesmo número.
+ * score_oficial e cap_razao são gravados de volta no banco para auditabilidade.
  */
 async function loadModuleScores(): Promise<ModuleScore[]> {
   try {
     const supabase = createServiceClient();
     if (!supabase) return [];
 
-    // Fonte de verdade do score: kph_intelligence_scores (score integer nativo)
-    // Fonte do insight text: kph_insights (insight_text)
-    const [scoresRes, insightsRes] = await Promise.all([
+    const [scoresRes, insightsRes, proposalsRes] = await Promise.all([
       (supabase as any)
         .from("kph_intelligence_scores")
         .select("modulo, score, semana, created_at")
@@ -48,9 +55,23 @@ async function loadModuleScores(): Promise<ModuleScore[]> {
         .select("modulo, insight_text, created_at")
         .order("created_at", { ascending: false })
         .limit(100),
+      // Riscos pendentes com severidade — usados para aplicar tetos
+      (supabase as any)
+        .from("kph_learning_proposals")
+        .select("id, modulo, severidade, titulo, status")
+        .in("status", ["pending", "open"])
+        .not("severidade", "is", null),
     ]);
 
-    // Deduplica scores: último por modulo
+    // Agrupa proposals por modulo
+    const proposalsByModule = new Map<string, ProposalRisk[]>();
+    for (const p of (proposalsRes.data ?? []) as (ProposalRisk & { modulo: string })[]) {
+      if (!p.modulo) continue;
+      if (!proposalsByModule.has(p.modulo)) proposalsByModule.set(p.modulo, []);
+      proposalsByModule.get(p.modulo)!.push(p);
+    }
+
+    // Deduplica scores: mais recente por modulo
     const seenScores = new Set<string>();
     const scoreMap = new Map<string, ScoreRow>();
     for (const row of (scoresRes.data ?? []) as ScoreRow[]) {
@@ -59,7 +80,7 @@ async function loadModuleScores(): Promise<ModuleScore[]> {
       scoreMap.set(row.modulo, row);
     }
 
-    // Deduplica insights: último por modulo
+    // Deduplica insights: mais recente por modulo
     const seenInsights = new Set<string>();
     const insightMap = new Map<string, string | null>();
     for (const row of (insightsRes.data ?? []) as InsightRow[]) {
@@ -68,19 +89,40 @@ async function loadModuleScores(): Promise<ModuleScore[]> {
       insightMap.set(row.modulo, row.insight_text);
     }
 
-    // Merge: usa todos os módulos com score como âncora
+    // Aplica política de teto e escreve score_oficial de volta no banco
     const results: ModuleScore[] = [];
+    const updatePromises: Promise<unknown>[] = [];
+
     for (const [mod, sr] of scoreMap) {
+      const rawScore = sr.score ?? 0;
+      const capResult = applyScoreCap(rawScore, proposalsByModule.get(mod) ?? []);
+
       results.push({
-        modulo: mod,
-        score: sr.score,
-        semana: sr.semana,
-        insight_text: insightMap.get(mod) ?? null,
+        modulo:        mod,
+        score:         sr.score,
+        score_oficial: capResult.score_oficial,
+        cap_razao:     capResult.cap_razao,
+        semana:        sr.semana,
+        insight_text:  insightMap.get(mod) ?? null,
       });
+
+      // Grava score_oficial + cap_razao para auditabilidade (best-effort)
+      if (sr.semana) {
+        updatePromises.push(
+          (supabase as any)
+            .from("kph_intelligence_scores")
+            .update({ score_oficial: capResult.score_oficial, cap_razao: capResult.cap_razao })
+            .eq("modulo", mod)
+            .eq("semana", sr.semana),
+        );
+      }
     }
 
-    // Ordena por score desc
-    return results.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+    // Fire-and-forget: não bloqueia a resposta
+    Promise.all(updatePromises).catch(() => {});
+
+    // Ordena por score_oficial desc
+    return results.sort((a, b) => (b.score_oficial ?? -1) - (a.score_oficial ?? -1));
   } catch {
     return [];
   }
@@ -174,25 +216,43 @@ export default async function OrchestratorPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {moduleScores.map((m) => {
+              const displayScore = m.score_oficial;
+              const isCapped = m.cap_razao != null;
               const scoreColor =
-                m.score == null ? "text-muted-foreground" :
-                m.score >= 80 ? "text-yellow-600 dark:text-yellow-400" :
-                m.score >= 60 ? "text-amber-600 dark:text-amber-400" :
+                displayScore == null ? "text-muted-foreground" :
+                displayScore >= 80 ? "text-yellow-600 dark:text-yellow-400" :
+                displayScore >= 60 ? "text-amber-600 dark:text-amber-400" :
                 "text-red-600 dark:text-red-400";
               return (
-                <div key={m.modulo} className="rounded-md bg-muted/40 p-3 border border-border/60">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                    {moduleLabel(m.modulo)}
+                <div
+                  key={m.modulo}
+                  className={`rounded-md bg-muted/40 p-3 border ${isCapped ? "border-red-500/40 dark:border-red-400/30" : "border-border/60"}`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {moduleLabel(m.modulo)}
+                    </span>
+                    {isCapped && (
+                      <span className="text-[10px] font-semibold px-1 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 leading-none">
+                        TETO
+                      </span>
+                    )}
                   </div>
                   <div className={`text-3xl font-bold tabular-nums ${scoreColor}`}>
-                    {m.score ?? "—"}
+                    {displayScore ?? "—"}
+                    <span className="text-sm font-normal text-muted-foreground ml-0.5">/100</span>
                   </div>
                   {m.semana && (
                     <div className="text-xs text-muted-foreground mt-1">
                       semana de {new Date(m.semana + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                     </div>
                   )}
-                  {m.insight_text && (
+                  {m.cap_razao && (
+                    <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5 leading-snug border-t border-red-500/20 pt-1.5">
+                      {m.cap_razao}
+                    </p>
+                  )}
+                  {!m.cap_razao && m.insight_text && (
                     <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
                       {m.insight_text}
                     </p>

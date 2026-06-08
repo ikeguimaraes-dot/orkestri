@@ -1,6 +1,7 @@
 import { requireUser } from "@kph/auth/server";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import { InsightPanel } from "@/components/intelligence/InsightPanel";
+import { applyScoreCap, type ProposalRisk } from "@/lib/score-policy";
 
 type PessoasInsight = {
   id: string;
@@ -10,6 +11,60 @@ type PessoasInsight = {
   gerado_por: string;
   created_at: string;
 };
+
+type OfficialScore = {
+  score_oficial: number;
+  cap_razao: string | null;
+  score_raw: number;
+};
+
+/**
+ * Calcula o score oficial de Pessoas aplicando a política de teto do kernel.
+ * Lê o score bruto de kph_intelligence_scores e os riscos pendentes de kph_learning_proposals.
+ * Grava score_oficial + cap_razao de volta no banco para consistência com o painel central.
+ */
+async function getOfficialPessoasScore(): Promise<OfficialScore | null> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return null;
+
+    const [scoreRes, proposalsRes] = await Promise.all([
+      (supabase as any)
+        .from("kph_intelligence_scores")
+        .select("score, semana")
+        .eq("modulo", "pessoas")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      (supabase as any)
+        .from("kph_learning_proposals")
+        .select("id, severidade, titulo, status")
+        .eq("modulo", "pessoas")
+        .in("status", ["pending", "open"])
+        .not("severidade", "is", null),
+    ]);
+
+    if (!scoreRes.data) return null;
+
+    const rawScore: number = scoreRes.data.score ?? 0;
+    const proposals: ProposalRisk[] = proposalsRes.data ?? [];
+    const capResult = applyScoreCap(rawScore, proposals);
+
+    // Grava score_oficial no banco (best-effort, sem bloquear)
+    if (scoreRes.data.semana) {
+      (supabase as any)
+        .from("kph_intelligence_scores")
+        .update({ score_oficial: capResult.score_oficial, cap_razao: capResult.cap_razao })
+        .eq("modulo", "pessoas")
+        .eq("semana", scoreRes.data.semana)
+        .then(() => {});
+    }
+
+    return { score_oficial: capResult.score_oficial, cap_razao: capResult.cap_razao, score_raw: rawScore };
+  } catch {
+    return null;
+  }
+}
 
 async function getLatestPessoasInsight(): Promise<PessoasInsight | null> {
   try {
@@ -57,7 +112,11 @@ const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL",
 
 export default async function HeadcountPage() {
   await requireUser();
-  const [rows, agentInsight] = await Promise.all([getHeadcount(), getLatestPessoasInsight()]);
+  const [rows, agentInsight, officialScore] = await Promise.all([
+    getHeadcount(),
+    getLatestPessoasInsight(),
+    getOfficialPessoasScore(),
+  ]);
 
   const totalAtivo = rows.reduce((s, r) => s + (r.headcount_ativo ?? 0), 0);
   const totalFolha = rows.reduce((s, r) => s + (r.folha_bruta ?? 0), 0);
@@ -148,7 +207,7 @@ export default async function HeadcountPage() {
       )}
 
       {agentInsight ? (
-        <AgentInsightBanner insight={agentInsight} />
+        <AgentInsightBanner insight={agentInsight} officialScore={officialScore} />
       ) : (
         <InsightPanel
           module="pessoas"
@@ -172,9 +231,25 @@ export default async function HeadcountPage() {
   );
 }
 
-function AgentInsightBanner({ insight }: { insight: PessoasInsight }) {
-  const score = insight.dados_referencia?.score;
-  const scoreColor = score == null ? "var(--text-3)" : score >= 80 ? "#B8975A" : score >= 60 ? "#A16207" : "#C4622D";
+function AgentInsightBanner({
+  insight,
+  officialScore,
+}: {
+  insight: PessoasInsight;
+  officialScore: OfficialScore | null;
+}) {
+  // Score oficial (com teto) tem prioridade; fallback para score bruto do insight
+  const displayScore = officialScore?.score_oficial ?? insight.dados_referencia?.score ?? null;
+  const capRazao = officialScore?.cap_razao ?? null;
+  const isCapped = capRazao != null;
+
+  const accentColor = isCapped ? "#C4622D" : "#B8975A";
+  const scoreColor =
+    displayScore == null ? "var(--text-3)" :
+    displayScore >= 80 ? "#B8975A" :
+    displayScore >= 60 ? "#A16207" :
+    "#C4622D";
+
   const semanaFormatted = insight.semana
     ? new Date(insight.semana + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
     : null;
@@ -184,31 +259,54 @@ function AgentInsightBanner({ insight }: { insight: PessoasInsight }) {
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
-        borderLeft: "3px solid #B8975A",
+        borderLeft: `3px solid ${accentColor}`,
         borderRadius: 10,
         padding: "18px 22px",
         marginTop: 4,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-3)" }}>
             Insight de Pessoas
           </span>
           <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 99, background: "rgba(184,151,90,0.14)", color: "#B8975A", fontWeight: 700 }}>
             Agente IA
           </span>
+          {isCapped && (
+            <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 99, background: "rgba(196,98,45,0.14)", color: "#C4622D", fontWeight: 700 }}>
+              TETO APLICADO
+            </span>
+          )}
           {semanaFormatted && (
             <span style={{ fontSize: 10, color: "var(--text-3)" }}>semana de {semanaFormatted}</span>
           )}
         </div>
-        {score != null && (
-          <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: 22, fontWeight: 700, color: scoreColor, letterSpacing: -0.4 }}>{score}</span>
+        {displayScore != null && (
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <span style={{ fontSize: 22, fontWeight: 700, color: scoreColor, letterSpacing: -0.4 }}>{displayScore}</span>
             <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: 3 }}>/100</span>
           </div>
         )}
       </div>
+
+      {capRazao && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "#C4622D",
+            background: "rgba(196,98,45,0.08)",
+            border: "1px solid rgba(196,98,45,0.2)",
+            borderRadius: 6,
+            padding: "6px 10px",
+            marginBottom: 10,
+            lineHeight: 1.5,
+          }}
+        >
+          {capRazao}
+        </div>
+      )}
+
       <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, margin: 0 }}>
         {insight.insight_text}
       </p>
