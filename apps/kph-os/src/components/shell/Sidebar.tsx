@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ZoneLink } from "./ZoneLink";
 
-// Prefixos que pertencem a zonas externas — navegação deve ser full-page (<a>),
-// não client-side (<Link>), para o rewrite do Next.js ser aplicado corretamente.
 const ZONE_PREFIXES = [
   "/financeiro", "/pessoas", "/operacao", "/compras",
   "/comercial", "/marca", "/inteligencia",
@@ -534,7 +533,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
                           if (!child.href) return null;
                           const ChildIcon = child.icon;
                           const childIsActive = child.href === activeHref;
-                          const ChildNavEl = isZoneHref(child.href) ? "a" : Link;
+                          const ChildNavEl = isZoneHref(child.href) ? ZoneLink : Link;
                           return (
                             <ChildNavEl
                               key={child.href}
@@ -581,7 +580,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
                 }
 
                 const active = it.href === activeHref;
-                const NavEl = isZoneHref(it.href!) ? "a" : Link;
+                const NavEl = isZoneHref(it.href!) ? ZoneLink : Link;
                 return (
                   <NavEl
                     key={it.href}
