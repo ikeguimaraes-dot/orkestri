@@ -1,3 +1,4 @@
+"use client";
 /**
  * MetricCard — KPI card com Fraunces + detalhe Ouro + delta badge.
  * Implementa a "Opção A" do design brief: linha Ouro 1.5px no topo.
