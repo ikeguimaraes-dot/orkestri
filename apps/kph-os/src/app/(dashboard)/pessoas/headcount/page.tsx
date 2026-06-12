@@ -1,7 +1,7 @@
 import { requireUser } from "@kph/auth/server";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import { InsightPanel } from "@/components/intelligence/InsightPanel";
-import { applyScoreCap, type ProposalRisk } from "@/lib/score-policy";
+import { applyScoreCap, type ProposalRisk } from "@kph/core";
 
 type PessoasInsight = {
   id: string;

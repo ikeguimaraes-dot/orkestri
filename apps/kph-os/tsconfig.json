@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -21,13 +25,33 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@kph/db": ["../../packages/db/src/index.ts"],
-      "@kph/db/*": ["../../packages/db/src/*"],
-      "@kph/ui": ["../../packages/ui/src/index.ts"],
-      "@kph/ui/*": ["../../packages/ui/src/*"],
-      "@kph/auth": ["../../packages/auth/src/index.ts"],
-      "@kph/auth/*": ["../../packages/auth/src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@kph/db": [
+        "../../packages/db/src/index.ts"
+      ],
+      "@kph/db/*": [
+        "../../packages/db/src/*"
+      ],
+      "@kph/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@kph/ui/*": [
+        "../../packages/ui/src/*"
+      ],
+      "@kph/auth": [
+        "../../packages/auth/src/index.ts"
+      ],
+      "@kph/auth/*": [
+        "../../packages/auth/src/*"
+      ],
+      "@kph/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@kph/core/*": [
+        "../../packages/core/src/*"
+      ]
     }
   },
   "include": [
@@ -38,5 +62,7 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@kph/auth": "*",
+    "@kph/core": "*",
     "@kph/db": "*",
     "@kph/ui": "*",
     "@base-ui/react": "^1.4.1",

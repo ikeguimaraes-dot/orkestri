@@ -2,7 +2,7 @@ import { listOrchestratorRuns } from "@/lib/orquestrador/actions";
 import { loadLMReports, generateLearningMachineReport } from "@/lib/orquestrador/learning-machine";
 import { handleApproval } from "@/lib/orquestrador/approve-handler";
 import { createServiceClient } from "@kph/db/supabase/server";
-import { applyScoreCap, type ProposalRisk } from "@/lib/score-policy";
+import { applyScoreCap, type ProposalRisk } from "@kph/core";
 import type { LMReport } from "@/lib/orquestrador/learning-machine";
 
 // Label map — cobre todos os módulos planejados; fallback capitaliza o slug
