@@ -4,6 +4,10 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./score-policy": "./src/score-policy.ts"
+    "./score-policy": "./src/score-policy.ts",
+    "./learning-machine": "./src/learning-machine.ts"
+  },
+  "dependencies": {
+    "@kph/db": "*"
   }
 }

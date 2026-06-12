@@ -1,9 +1,10 @@
 import { listOrchestratorRuns } from "@/lib/orquestrador/actions";
-import { loadLMReports, generateLearningMachineReport } from "@/lib/orquestrador/learning-machine";
+import { loadLMReports, generateLearningMachineReport } from "@kph/core/learning-machine";
+import { notifyLearningMachineDiscord } from "@/lib/orquestrador/lm-notify";
 import { handleApproval } from "@/lib/orquestrador/approve-handler";
 import { createServiceClient } from "@kph/db/supabase/server";
 import { applyScoreCap, type ProposalRisk } from "@kph/core";
-import type { LMReport } from "@/lib/orquestrador/learning-machine";
+import type { LMReport } from "@kph/core/learning-machine";
 
 // Label map — cobre todos os módulos planejados; fallback capitaliza o slug
 const MODULE_LABELS: Record<string, string> = {
@@ -140,7 +141,7 @@ export const dynamic = "force-dynamic";
 
 async function triggerLearningMachine() {
   "use server";
-  await generateLearningMachineReport();
+  await generateLearningMachineReport({ notify: notifyLearningMachineDiscord });
   revalidatePath("/orquestrador");
 }
 

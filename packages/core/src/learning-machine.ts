@@ -1,9 +1,12 @@
 // Learning Machine — análise semanal de atividade dos 40 agentes IA do KPH OS.
 // Roda toda sexta via Vercel Cron (0 11 * * 5 = 08:00 BRT).
 // Requer ANTHROPIC_API_KEY configurada no ambiente.
+//
+// Kernel @kph/core: implementação ÚNICA, consumida pelo shell (apps/kph-os)
+// e pelo app inteligencia (apps/inteligencia). Notificação pós-relatório é
+// injetada pelo caller via `opts.notify` — o core não conhece Discord.
 
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
-import { sendDiscordMessage, DISCORD_COLORS } from "@/lib/discord/notify";
 
 // ── Catálogo dos 40 agentes por categoria ─────────────────────────────
 
@@ -83,6 +86,25 @@ export type LMReportInsight = {
   insight_da_semana: string;
 };
 
+export type AgentRunRow = {
+  agent_name: string;
+  category: string;
+  status: string;
+  week_number: number;
+  year: number;
+  created_at: string;
+};
+
+/** Resumo entregue ao notifier injetado após o relatório ser salvo. */
+export type LMNotifyPayload = {
+  week: number;
+  year: number;
+  insights: LMReportInsight | null;
+  activeAgents: number;
+  totalAgents: number;
+  dormantCount: number;
+};
+
 export type LMReport = {
   id: string;
   week_number: number;
@@ -113,7 +135,9 @@ function currentIsoWeek(): { week: number; year: number } {
 
 // ── Main function ─────────────────────────────────────────────────────
 
-export async function generateLearningMachineReport(): Promise<LMReport | null> {
+export async function generateLearningMachineReport(
+  opts: { notify?: (payload: LMNotifyPayload) => Promise<void> } = {},
+): Promise<LMReport | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
@@ -310,34 +334,21 @@ Analise e responda APENAS com JSON válido nesta estrutura exata (sem markdown, 
     })
     .then(() => {/* silencioso */});
 
-  // 7) Notify Discord #orquestrador
-  const dormantCount = ALL_AGENTS.length - activeAgents.size;
-  await sendDiscordMessage('orquestrador', {
-    title: `🧠 Learning Machine — Semana ${week}/${year}`,
-    description: insights
-      ? `${insights.headline}\n\n${insights.insight_da_semana}`
-      : `Relatório semanal gerado. ${activeAgents.size} agentes ativos de ${ALL_AGENTS.length}.`,
-    color: DISCORD_COLORS.purple,
-    fields: [
-      {
-        name: 'Score Operacional',
-        value: insights?.score_operacional != null ? `${insights.score_operacional}/100` : 'N/A',
-        inline: true,
-      },
-      {
-        name: 'Agentes Ativos',
-        value: `${activeAgents.size}/${ALL_AGENTS.length}`,
-        inline: true,
-      },
-      {
-        name: 'Agentes Dormentes',
-        value: `${dormantCount}`,
-        inline: true,
-      },
-    ],
-    footer: { text: 'Próximo relatório: sexta-feira 08:00 BRT' },
-    timestamp: new Date().toISOString(),
-  });
+  // 7) Notificação injetada pelo caller (falha não derruba o relatório)
+  if (opts.notify) {
+    try {
+      await opts.notify({
+        week,
+        year,
+        insights,
+        activeAgents: activeAgents.size,
+        totalAgents: ALL_AGENTS.length,
+        dormantCount: ALL_AGENTS.length - activeAgents.size,
+      });
+    } catch (e) {
+      console.error("[LM] notify error:", e);
+    }
+  }
 
   return {
     id: (saved as { id: string }).id,
