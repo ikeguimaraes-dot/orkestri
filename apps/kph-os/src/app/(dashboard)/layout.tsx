@@ -1,5 +1,4 @@
 import { Sidebar } from "@/components/shell/Sidebar";
-import { TopBar } from "@/components/shell/TopBar";
 import { AuthProvider } from "@kph/auth/context";
 import { requireUser } from "@kph/auth/server";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
@@ -29,10 +28,9 @@ export default async function DashboardLayout({
         }}
       >
         <Sidebar />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <TopBar />
-          <main className="shell-main" style={{ flex: 1, overflowY: "auto", padding: "32px 28px" }}>{children}</main>
-        </div>
+        <main className="shell-main kph-page-main" style={{ flex: 1, overflowY: "auto", padding: "32px 28px" }}>
+          {children}
+        </main>
       </div>
     </AuthProvider>
   );
