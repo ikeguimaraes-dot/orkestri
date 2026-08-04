@@ -176,35 +176,17 @@ export function Sidebar() {
         }}
       >
         <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid var(--sidebar-border)" }}>
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "1.25rem",
-              fontWeight: 400,
-              color: "var(--text)",
-              letterSpacing: "-0.02em",
-              lineHeight: 1,
-            }}
-          >
-            KPH{" "}
-            <span
-              style={{
-                color: "var(--kph-ouro, #B8975A)",
-                fontStyle: "italic",
-              }}
-            >
-              OS
-            </span>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", letterSpacing: -0.5 }}>
+            KPH <span style={{ color: "var(--brand)" }}>OS</span>
           </div>
           <div
             style={{
               fontSize: "0.625rem",
               color: "var(--text-3)",
-              marginTop: 4,
-              letterSpacing: "0.12em",
+              marginTop: 2,
+              letterSpacing: 1.2,
               textTransform: "uppercase",
               fontWeight: 600,
-              fontFamily: "var(--font-ui)",
             }}
           >
             Operações
@@ -330,7 +312,7 @@ export function Sidebar() {
             onClick={() => setSignOutConfirm(true)}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              width: 44, height: 44, borderRadius: "var(--r-md, 6px)",
+              width: 28, height: 28, borderRadius: 6,
               color: "var(--text-3)", border: "none", cursor: "pointer",
               background: "transparent",
               transition: "color var(--t, 180ms ease), background var(--t, 180ms ease)",
