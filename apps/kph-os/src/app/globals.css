@@ -324,6 +324,22 @@
 /* ══════════════════════════════════════════════════════
    SHELL RESPONSIVO
    ══════════════════════════════════════════════════════ */
+.shell-sidebar {
+  /* O menu lateral segue o padrão visual do módulo Pessoas. */
+  --sidebar: #131316;
+  --sidebar-border: #27272A;
+  --surface-2: #1A1A1E;
+  --surface-3: #232328;
+  --text: #E5E5E7;
+  --text-2: #A1A1AA;
+  --text-3: #71717A;
+  --border: #27272A;
+  --border-strong: #3F3F46;
+  --brand: #C4622D;
+  --brand-soft: rgba(196, 98, 45, 0.16);
+  --brand-strong: #9D4E24;
+}
+
 @media (max-width: 767px) {
   .shell-sidebar {
     position: fixed !important;
