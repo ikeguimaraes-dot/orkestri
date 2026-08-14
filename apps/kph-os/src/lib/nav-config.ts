@@ -12,6 +12,14 @@ export type NavGroupConfig = {
   label: string | null;
   icon: string | null;
   defaultOpen: boolean;
+  /**
+   * Slug da categoria (fk → categories.slug) que libera este grupo no sidebar.
+   *
+   * Quando ausente, o grupo é considerado "sempre visível" (ex: 'home' = Dashboard).
+   * Quando presente, o grupo só aparece se o usuário tiver a categoria
+   * correspondente em user_categories (ou se for founder).
+   */
+  category?: string;
   items: NavItemConfig[];
 };
 
@@ -31,6 +39,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "operacao",
     label: "Operação",
     icon: "TrendingUp",
+    category: "operacao",
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/operacao", icon: "LayoutDashboard" },
@@ -48,6 +57,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "compras",
     label: "Compras",
     icon: "ShoppingCart",
+    category: "compras",
     defaultOpen: false,
     items: [
       { label: "Pedidos", href: "/compras", icon: "ShoppingCart" },
@@ -66,6 +76,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "financeiro",
     label: "Financeiro",
     icon: "Wallet",
+    category: "financeiro",
     defaultOpen: false,
     items: [
       { label: "Cockpit", href: "/financeiro", icon: "Gauge" },
@@ -104,6 +115,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "pessoas",
     label: "Pessoas",
     icon: "Users",
+    category: "pessoas",
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/pessoas", icon: "LayoutDashboard" },
@@ -175,6 +187,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "comercial",
     label: "Comercial",
     icon: "Handshake",
+    category: "comercial",
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/comercial", icon: "LayoutDashboard" },
@@ -190,6 +203,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "marca",
     label: "Marca",
     icon: "Bookmark",
+    category: "marca",
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/marca", icon: "LayoutDashboard" },
@@ -201,9 +215,19 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     ],
   },
   {
+    id: "admin",
+    label: "Admin",
+    icon: "ShieldAlert",
+    defaultOpen: false,
+    items: [
+      { label: "Categorias & Acesso", href: "/admin/categorias", icon: "ShieldAlert", roles: ["founder"] },
+    ],
+  },
+  {
     id: "inteligencia",
     label: "Inteligência",
     icon: "Brain",
+    category: "inteligencia",
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/inteligencia", icon: "LayoutDashboard" },
@@ -218,3 +242,30 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     ],
   },
 ];
+
+/**
+ * Filtra os grupos da navegação pelas categorias que o usuário possui.
+ *
+ * Regras:
+ *   1. Grupos SEM `category` definida (ex: 'home') sempre passam.
+ *   2. Grupos COM `category` passam se o usuário tiver aquela categoria,
+ *      ou se for founder (vê tudo, sem precisar popular user_categories).
+ *   3. Lista de categorias vazia + não-founder ⇒ vê só os grupos sem category
+ *      (i.e. só o Dashboard). É o default seguro pra quem acabou de ser
+ *      cadastrado e ainda não recebeu módulos.
+ *
+ * Função pura — testável e reusável por outros consumidores do NAV_CONFIG
+ * (ex: CommandPalette, MobileShell, etc.).
+ */
+export function filterNavByCategories(
+  config: NavGroupConfig[],
+  userCategories: string[],
+  isFounder: boolean,
+): NavGroupConfig[] {
+  const set = new Set(userCategories);
+  return config.filter((g) => {
+    if (!g.category) return true;        // home / sempre visível
+    if (isFounder) return true;          // bypass total
+    return set.has(g.category);
+  });
+}
