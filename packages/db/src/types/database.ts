@@ -279,6 +279,66 @@ export type Database = {
           created_at?: string;
         };
       };
+      // Migration 001_categories.sql — módulos de produto visíveis no sidebar.
+      // Ortogonal a roles: um "gerente" pode ter acesso só ao Financeiro, etc.
+      categories: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string | null;
+          icon: string | null;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          description?: string | null;
+          icon?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          description?: string | null;
+          icon?: string | null;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_categories: {
+        Row: {
+          id: string;
+          user_id: string;
+          category_id: string;
+          granted_at: string;
+          granted_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          category_id: string;
+          granted_at?: string;
+          granted_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          category_id?: string;
+          granted_at?: string;
+          granted_by?: string | null;
+        };
+      };
       audit_log: {
         Row: {
           id: string;
@@ -2715,6 +2775,8 @@ export type Unit = Tables<"units">;
 export type BrandLink = Tables<"brand_links">;
 export type RoleRow = Tables<"roles">;
 export type UserRole = Tables<"user_roles">;
+export type Category = Tables<"categories">;
+export type UserCategory = Tables<"user_categories">;
 export type AuditLogEntry = Tables<"audit_log">;
 export type EventRow = Tables<"events">;
 export type EventMenuItem = Tables<"event_menu_items">;

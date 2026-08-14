@@ -28,6 +28,18 @@ export type CurrentUser = {
     brandId: string | null;
     groupId: string | null;
   }>;
+  /**
+   * Slugs das categorias (módulos de produto) que o usuário enxerga no sidebar.
+   *
+   * Categorias são ortogonais a roles: um "colaborador" pode ter acesso só
+   * ao Financeiro, etc. Usuários sem categoria vêem apenas o Dashboard
+   * (slug "home"), a menos que sejam founder — nesse caso a aplicação
+   * concede acesso a todas as categorias automaticamente, sem precisar
+   * popular user_categories.
+   *
+   * Fonte: tabela `user_categories` (N:N com `categories`).
+   */
+  categories: string[];
 };
 
 /**
@@ -85,6 +97,30 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       };
     });
 
+    // Categorias (módulos visíveis no sidebar). Embedded select via FK.
+    // Falha silenciosa: se a tabela não existir ainda (migration não rodada)
+    // o user fica sem categoria e vê só Dashboard — melhor que quebrar login.
+    type CategoryJoinRow = {
+      category_id: string;
+      categories: { slug: string } | { slug: string }[] | null;
+    };
+    const { data: catData, error: catError } = await supabase
+      .from("user_categories")
+      .select("category_id, categories!inner(slug)")
+      .eq("user_id", user.id)
+      .returns<CategoryJoinRow[]>();
+
+    if (catError) {
+      console.warn("[getCurrentUser] categories query error:", catError.message);
+    }
+
+    const categories = (catData ?? [])
+      .map((c) => {
+        const cat = Array.isArray(c.categories) ? c.categories[0] : c.categories;
+        return cat?.slug ?? null;
+      })
+      .filter((slug): slug is string => typeof slug === "string" && slug.length > 0);
+
     // Resolve display_name do user_metadata (campo "Display name" no
     // painel Supabase Auth → Users). Ordem de preferência: display_name,
     // full_name, name. Suporta valores não-string defensivamente.
@@ -101,6 +137,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       email: user.email ?? null,
       displayName,
       roles,
+      categories,
     };
   } catch (e) {
     // Next.js usa exceptions especiais (NEXT_REDIRECT, NEXT_DYNAMIC_USAGE) pra

@@ -117,6 +117,24 @@ export function useHasRole(allowed: ReadonlyArray<string>): boolean {
   return roles.some((r) => allowed.includes(r.role));
 }
 
+/** Slugs de categoria (módulos visíveis no sidebar) do usuário atual. */
+export function useCategories(): string[] {
+  return useAuth().user?.categories ?? [];
+}
+
+/**
+ * True se o usuário tem a categoria (slug) OU é founder (vê tudo).
+ * Útil pra esconder ações específicas em páginas que dependem do módulo,
+ * ex: <GuardByCategory slug="financeiro">.
+ */
+export function useHasCategory(slug: string): boolean {
+  const cats = useCategories();
+  if (cats.includes(slug)) return true;
+  // Mesmo cálculo do Sidebar: founder sempre passa.
+  const roles = useRoles();
+  return roles.some((r) => r.role === "founder");
+}
+
 /** Acesso direto ao Supabase no browser (com sessão atual). */
 export function useSupabase() {
   // Recriar o client em cada render é barato (singleton interno do @supabase/ssr).

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ZoneLink } from "./ZoneLink";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NAV_CONFIG, type NavGroupConfig, type NavItemConfig } from "@/lib/nav-config";
+import { NAV_CONFIG, filterNavByCategories, type NavGroupConfig, type NavItemConfig } from "@/lib/nav-config";
 import {
   // shell
   ChevronDown, ChevronRight, Check, LogOut,
@@ -82,7 +82,7 @@ function resolveGroups(raw: NavGroupConfig[]): NavGroup[] {
   }));
 }
 
-const NAV_GROUPS: NavGroup[] = resolveGroups(NAV_CONFIG);
+const NAV_GROUPS_RAW: NavGroup[] = resolveGroups(NAV_CONFIG);
 
 const STORAGE_KEY = "kph_sidebar_groups";
 
@@ -90,6 +90,19 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { unit, units, setUnit } = useUnit();
+
+  // Filtra grupos do NAV_CONFIG pelas categorias do usuário.
+  // - Founder: vê todos os grupos (bypass total).
+  // - Não-founder: só vê grupos cuja categoria o user possui em user_categories.
+  // - Sem categoria (default recém-criado): vê só o Dashboard (home).
+  // Nota: isFounder() em @kph/auth/server é server-only (importa "server-only"),
+  // então calculamos direto a partir de user.roles aqui no client.
+  const founder = !!user?.roles.some((r) => r.role === "founder");
+  const userCategories = user?.categories ?? [];
+  const NAV_GROUPS = useMemo<NavGroup[]>(
+    () => resolveGroups(filterNavByCategories(NAV_CONFIG, userCategories, founder)),
+    [userCategories, founder],
+  );
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -267,7 +280,12 @@ export function Sidebar() {
           </div>
         </div>
 
-        <SidebarNav pathname={pathname} groups={NAV_GROUPS} />
+        <SidebarNav
+          pathname={pathname}
+          groups={NAV_GROUPS}
+          userRoles={user?.roles.map((r) => r.role) ?? []}
+          isFounder={founder}
+        />
 
         <div
           style={{
@@ -450,10 +468,44 @@ function SignOutConfirm({ onCancel }: { onCancel: () => void }) {
 }
 
 // ── Sub: nav com grupos colapsáveis ──────────────────────────
-function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[] }) {
+function SidebarNav({
+  pathname,
+  groups,
+  userRoles,
+  isFounder,
+}: {
+  pathname: string;
+  groups: NavGroup[];
+  userRoles: ReadonlyArray<string>;
+  isFounder: boolean;
+}) {
+  /**
+   * Filtro fino por item (campo `roles` no NAV_CONFIG).
+   *
+   * Aplicado AQUI pra founder continuar vendo tudo (inclusive itens
+   * marcados com roles específicas). Itens sem `roles` passam pra qualquer
+   * usuário. Categorias (módulo de produto) já foram aplicadas no pai.
+   */
+  const itemVisible = (it: NavItem): boolean => {
+    const allowedRoles = (it as unknown as { roles?: string[] }).roles;
+    if (!allowedRoles || allowedRoles.length === 0) return true;
+    if (isFounder) return true;
+    return allowedRoles.some((r) => userRoles.includes(r));
+  };
+
+  const visibleGroups = useMemo<NavGroup[]>(
+    () =>
+      groups.map((g) => ({
+        ...g,
+        items: g.items.filter(itemVisible),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groups, userRoles, isFounder],
+  );
+
   const allItems = useMemo(
     () =>
-      groups.flatMap((g) =>
+      visibleGroups.flatMap((g) =>
         g.items.flatMap((it) => {
           const base = it.href ? [{ href: it.href, groupId: g.id }] : [];
           const childItems = (it.children ?? []).flatMap((c) =>
@@ -462,7 +514,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
           return [...base, ...childItems];
         }),
       ),
-    [groups],
+    [visibleGroups],
   );
 
   const activeHref = useMemo(() => {
@@ -485,12 +537,12 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const m: Record<string, boolean> = {};
-    for (const g of groups) m[g.id] = g.defaultOpen;
+    for (const g of visibleGroups) m[g.id] = g.defaultOpen;
     return m;
   });
   const [openItems, setOpenItems] = useState<Record<string, boolean>>(() => {
     const m: Record<string, boolean> = {};
-    for (const g of groups) {
+    for (const g of visibleGroups) {
       for (const it of g.items) {
         if (it.children && it.defaultOpen) m[it.label] = true;
       }
@@ -522,14 +574,14 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
   // Auto-abre o item pai quando um filho está ativo
   useEffect(() => {
     if (!activeHref) return;
-    for (const g of groups) {
+    for (const g of visibleGroups) {
       for (const it of g.items) {
         if (it.children?.some((c) => c.href === activeHref)) {
           setOpenItems((prev) => (prev[it.label] ? prev : { ...prev, [it.label]: true }));
         }
       }
     }
-  }, [activeHref, groups]);
+  }, [activeHref, visibleGroups]);
 
   function toggleGroup(id: string) {
     setOpenMap((prev) => {
@@ -560,7 +612,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
         overflowY: "auto",
       }}
     >
-      {groups.map((g) => {
+      {visibleGroups.map((g) => {
         const isOpen = openMap[g.id] ?? g.defaultOpen;
         return (
           <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
