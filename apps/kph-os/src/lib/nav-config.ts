@@ -43,6 +43,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/operacao", icon: "LayoutDashboard" },
+      { label: "Relatório", href: "/operacao/relatorio", icon: "FileBarChart2" },
       { label: "Mapa da Casa", href: "/operacao/mapa", icon: "MapPin" },
       { label: "Performance", href: "/operacao/performance", icon: "Activity" },
       { label: "Vendedores", href: "/operacao/vendedores", icon: "UserCheck" },
