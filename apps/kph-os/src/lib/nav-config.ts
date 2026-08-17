@@ -204,7 +204,6 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     id: "marca",
     label: "Marca",
     icon: "Bookmark",
-    category: "marca",
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/marca", icon: "LayoutDashboard" },
