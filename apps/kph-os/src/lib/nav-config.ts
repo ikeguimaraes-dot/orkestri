@@ -208,6 +208,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     defaultOpen: false,
     items: [
       { label: "Visão Geral", href: "/marca", icon: "LayoutDashboard" },
+      { label: "Escritório", href: "/escritorio", icon: "Building2" },
       { label: "Diretório", href: "/marcas", icon: "Building2" },
       { label: "BrandBook", href: "/marca/brandbook", icon: "BookOpen" },
       { label: "Quem Somos", href: "/marca/quem-somos", icon: "Info" },
