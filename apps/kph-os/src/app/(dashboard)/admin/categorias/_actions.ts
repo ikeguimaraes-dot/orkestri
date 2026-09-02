@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createServiceClient } from "@kph/db/supabase/server";
 import { requireRole } from "@kph/auth/server";
 
 /**
@@ -27,8 +27,24 @@ export async function setUserCategories(
     return { ok: false, error: "categoryIds precisa ser array" };
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return { ok: false, error: "supabase indisponível" };
+  const supabase = createServiceClient();
+  if (!supabase) return { ok: false, error: "Service role não configurada no servidor" };
+
+  const uniqueCategoryIds = [...new Set(categoryIds)];
+  if (uniqueCategoryIds.some((id) => typeof id !== "string" || !id)) {
+    return { ok: false, error: "Uma ou mais categorias são inválidas" };
+  }
+  if (uniqueCategoryIds.length > 0) {
+    const { data: validCategories, error: validationError } = await supabase
+      .from("categories")
+      .select("id")
+      .in("id", uniqueCategoryIds)
+      .eq("is_active", true);
+    if (validationError) return { ok: false, error: validationError.message };
+    if ((validCategories ?? []).length !== uniqueCategoryIds.length) {
+      return { ok: false, error: "Uma ou mais categorias não existem ou estão inativas" };
+    }
+  }
 
   // DELETE todos os vínculos antigos do user.
   const { error: delErr } = await supabase
@@ -41,8 +57,8 @@ export async function setUserCategories(
   }
 
   // INSERT em lote (vazio = sem categoria = usuário vê só Dashboard).
-  if (categoryIds.length > 0) {
-    const rows = categoryIds.map((categoryId) => ({
+  if (uniqueCategoryIds.length > 0) {
+    const rows = uniqueCategoryIds.map((categoryId) => ({
       user_id: userId,
       category_id: categoryId,
       granted_by: me.id,

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@kph/auth/server";
-import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createServiceClient, createSupabaseServerClient } from "@kph/db/supabase/server";
 import type { Category, UserCategory } from "@kph/db/types/database";
 import { CategoriasAdminClient } from "./CategoriasAdminClient";
 
@@ -57,10 +57,19 @@ export default async function CategoriasAdminPage() {
     );
   }
 
-  // Lista de usuários. Como o auth.users é gerenciado pelo Supabase Auth,
-  // a forma recomendada é listar via service role. Aqui usamos a tabela
-  // pública 'profiles' se existir; senão, cai pra service role admin.
-  const users = await loadUsers();
+  // Lista as contas reais via Admin API; profiles é apenas um complemento
+  // opcional para exibir o nome cadastrado no sistema.
+  const usersResult = await loadUsers();
+  if (!usersResult.ok) {
+    return (
+      <ErrorState
+        title="Erro ao carregar usuários"
+        detail={usersResult.error}
+        hint="Configure SUPABASE_SERVICE_ROLE_KEY no servidor (inclusive na Vercel) e faça um novo deploy. Essa chave nunca deve ser pública."
+      />
+    );
+  }
+  const users = usersResult.users;
 
   // Indexa vínculos por user_id pra lookup O(1) no client.
   const linksByUser = new Map<string, string[]>();
@@ -114,7 +123,7 @@ export default async function CategoriasAdminPage() {
         <ErrorState
           title="Nenhum usuário encontrado"
           detail="A consulta a auth.users / profiles retornou vazia."
-          hint="Se você está em produção, configure a função loadUsers() para usar service role key e listar auth.users."
+          hint="Não há contas cadastradas no Supabase Auth deste projeto."
         />
       ) : (
         <CategoriasAdminClient
@@ -134,50 +143,65 @@ type AdminUser = {
   isFounder: boolean;
 };
 
-async function loadUsers(): Promise<AdminUser[]> {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return [];
+async function loadUsers(): Promise<
+  { ok: true; users: AdminUser[] } | { ok: false; error: string }
+> {
+  const service = createServiceClient();
+  if (!service) {
+    return { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada no servidor." };
+  }
 
-  // 1) Tenta via profiles (campos públicos: id, email, display_name).
+  const authUsers: Array<{ id: string; email?: string; user_metadata: Record<string, unknown> }> = [];
+  const perPage = 1000;
+  let page = 1;
+  while (true) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage });
+    if (error) return { ok: false, error: `Supabase Auth: ${error.message}` };
+    authUsers.push(...data.users);
+    if (data.users.length < perPage) break;
+    page += 1;
+  }
+
   type ProfileRow = { id: string; email: string | null; display_name: string | null };
-  const { data: profiles, error: pErr } = await supabase
+  const { data: profiles } = await service
     .from("profiles")
     .select("id, email, display_name")
-    .order("email")
     .returns<ProfileRow[]>();
+  const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const founderSet = new Set<string>();
+  const ids = authUsers.map((user) => user.id);
 
-  if (!pErr && profiles && profiles.length > 0) {
-    // Detecta founder via user_roles.
-    const ids = profiles.map((p) => p.id);
-    const { data: rolesData } = await supabase
+  if (ids.length > 0) {
+    const { data: rolesData, error: rolesError } = await service
       .from("user_roles")
       .select("user_id, roles!inner(name)")
       .in("user_id", ids)
       .returns<Array<{ user_id: string; roles: { name: string } | { name: string }[] | null }>>();
-
-    const founderSet = new Set<string>();
-    for (const r of rolesData ?? []) {
-      const role = Array.isArray(r.roles) ? r.roles[0] : r.roles;
-      if (role?.name === "founder") founderSet.add(r.user_id);
+    if (rolesError) return { ok: false, error: `Permissões: ${rolesError.message}` };
+    for (const row of rolesData ?? []) {
+      const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+      if (role?.name === "founder") founderSet.add(row.user_id);
     }
-
-    return profiles.map((p) => ({
-      id: p.id,
-      email: p.email ?? null,
-      displayName: p.display_name ?? null,
-      isFounder: founderSet.has(p.id),
-    }));
   }
 
-  // 2) Fallback: lista direto de auth.users via service role. Requer que
-  // createSupabaseServerClient esteja usando service role no servidor.
-  // (Como fallback seguro, retornamos array vazio e o usuário vê a msg
-  // orientando a criar a tabela profiles.)
-  console.warn(
-    "[loadUsers] Tabela profiles vazia/inexistente — adicione 'profiles' (id, email, display_name) " +
-      "para popular esta tela. SELECT * FROM auth.users direto requer service role configurado.",
+  const users = authUsers.map((user) => {
+    const profile = profileById.get(user.id);
+    const metadataName = [
+      user.user_metadata?.display_name,
+      user.user_metadata?.full_name,
+      user.user_metadata?.name,
+    ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    return {
+      id: user.id,
+      email: profile?.email ?? user.email ?? null,
+      displayName: profile?.display_name ?? metadataName ?? null,
+      isFounder: founderSet.has(user.id),
+    };
+  });
+  users.sort((a, b) =>
+    (a.displayName ?? a.email ?? "").localeCompare(b.displayName ?? b.email ?? "", "pt-BR"),
   );
-  return [];
+  return { ok: true, users };
 }
 
 function ErrorState({
