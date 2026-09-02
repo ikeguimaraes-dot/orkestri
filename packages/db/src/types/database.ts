@@ -2733,6 +2733,14 @@ export type Database = {
           is_founder: boolean;
         }>;
       };
+      admin_set_user_role: {
+        Args: {
+          p_user_id: string;
+          p_role_id: string | null;
+          p_unit_ids: string[];
+        };
+        Returns: undefined;
+      };
       kph_is_founder: { Args: Record<string, never>; Returns: boolean };
       kph_is_founder_or_cfo: { Args: Record<string, never>; Returns: boolean };
       kph_has_role_for_unit: { Args: { p_unit_id: string }; Returns: boolean };

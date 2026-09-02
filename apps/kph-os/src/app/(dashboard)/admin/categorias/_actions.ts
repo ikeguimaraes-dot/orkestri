@@ -82,3 +82,34 @@ export async function setUserCategories(
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+export async function setUserRole(
+  userId: string,
+  roleId: string | null,
+  unitIds: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireRole(["founder"]);
+  if (!userId || typeof userId !== "string") {
+    return { ok: false, error: "Usuário inválido" };
+  }
+  if (roleId !== null && (typeof roleId !== "string" || !roleId)) {
+    return { ok: false, error: "Nível de acesso inválido" };
+  }
+  const uniqueUnitIds = [...new Set(unitIds)];
+  if (roleId !== null && uniqueUnitIds.length === 0) {
+    return { ok: false, error: "Selecione ao menos uma unidade" };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, error: "Supabase indisponível" };
+  const { error } = await supabase.rpc("admin_set_user_role", {
+    p_user_id: userId,
+    p_role_id: roleId,
+    p_unit_ids: roleId === null ? [] : uniqueUnitIds,
+  } as never);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/categorias");
+  return { ok: true };
+}

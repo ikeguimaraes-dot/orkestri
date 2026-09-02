@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { setUserCategories } from "./_actions";
+import { setUserCategories, setUserRole } from "./_actions";
 
 type AdminUser = {
   id: string;
@@ -19,17 +19,40 @@ type Category = {
   sort_order: number;
 };
 
+type Role = { id: string; name: string; description: string | null };
+type Unit = { id: string; name: string };
+type AccessSelection = { roleId: string | null; unitIds: string[] };
+
+const ROLE_LABELS: Record<string, string> = {
+  founder: "Fundador",
+  cfo: "CFO",
+  gm: "Gerente geral",
+  pessoas: "Pessoas / RH",
+  chef: "Chef",
+  comprador: "Comprador",
+  colaborador: "Colaborador",
+  socio_readonly: "Sócio — somente leitura",
+  comercial: "Comercial",
+  operacional: "Operacional",
+};
+
 type Props = {
   users: AdminUser[];
   categories: Category[];
   /** Map userId → array de categoryId já marcados */
   initialLinks: Record<string, string[]>;
+  roles: Role[];
+  units: Unit[];
+  initialAccess: Record<string, { roleId: string; unitIds: string[] }>;
 };
 
 export function CategoriasAdminClient({
   users,
   categories,
   initialLinks,
+  roles,
+  units,
+  initialAccess,
 }: Props) {
   // Estado: selections por usuário (Set serializa em array).
   // Inicializa com initialLinks; ao salvar, atualiza estado e mostra toast.
@@ -41,6 +64,13 @@ export function CategoriasAdminClient({
     return m;
   });
   const [pending, startTransition] = useTransition();
+  const [access, setAccess] = useState<Record<string, AccessSelection>>(() => {
+    const result: Record<string, AccessSelection> = {};
+    for (const user of users) {
+      result[user.id] = initialAccess[user.id] ?? { roleId: null, unitIds: [] };
+    }
+    return result;
+  });
   const [feedback, setFeedback] = useState<
     | { kind: "ok" | "err"; msg: string; userId: string }
     | null
@@ -98,6 +128,18 @@ export function CategoriasAdminClient({
     });
   }
 
+  function saveAccess(userId: string) {
+    const selected = access[userId] ?? { roleId: null, unitIds: [] };
+    startTransition(async () => {
+      const res = await setUserRole(userId, selected.roleId, selected.unitIds);
+      setFeedback({
+        kind: res.ok ? "ok" : "err",
+        msg: res.ok ? "Nível de acesso salvo." : res.error,
+        userId,
+      });
+    });
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Toolbar */}
@@ -137,6 +179,9 @@ export function CategoriasAdminClient({
         const sel = selections[u.id] ?? new Set();
         const isExpanded = expandedUserId === u.id;
         const fb = feedback?.userId === u.id ? feedback : null;
+        const userAccess = access[u.id] ?? { roleId: null, unitIds: [] };
+        const rawRoleName = roles.find((role) => role.id === userAccess.roleId)?.name;
+        const roleName = rawRoleName ? (ROLE_LABELS[rawRoleName] ?? rawRoleName) : null;
 
         return (
           <div
@@ -216,6 +261,21 @@ export function CategoriasAdminClient({
                   Founder
                 </span>
               )}
+              {!u.isFounder && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    background: roleName ? "var(--brand-soft)" : "var(--bg)",
+                    color: roleName ? "var(--brand)" : "var(--text-3)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {roleName ?? "Sem nível"}
+                </span>
+              )}
               <span
                 style={{
                   fontSize: 12,
@@ -256,6 +316,114 @@ export function CategoriasAdminClient({
                   gap: 12,
                 }}
               >
+                <div
+                  style={{
+                    padding: 14,
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    background: "var(--bg)",
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>
+                    Nível de acesso
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr)) auto",
+                      gap: 10,
+                      alignItems: "end",
+                    }}
+                  >
+                    <label style={{ fontSize: 11, color: "var(--text-3)" }}>
+                      Nível
+                      <select
+                        value={userAccess.roleId ?? ""}
+                        disabled={u.isFounder || pending}
+                        onChange={(event) => {
+                          const roleId = event.target.value || null;
+                          setAccess((prev) => ({
+                            ...prev,
+                            [u.id]: {
+                              roleId,
+                              unitIds: roleId ? prev[u.id]?.unitIds ?? [] : [],
+                            },
+                          }));
+                          setFeedback(null);
+                        }}
+                        style={selectStyle}
+                      >
+                        <option value="">Sem nível de acesso</option>
+                        {roles.map((role) => (
+                          <option key={role.id} value={role.id}>
+                            {ROLE_LABELS[role.name] ?? role.name}{role.description ? ` — ${role.description}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => saveAccess(u.id)}
+                      disabled={u.isFounder || pending || (!!userAccess.roleId && userAccess.unitIds.length === 0)}
+                      style={{ ...bulkBtnStyle, height: 35, color: "var(--brand)" }}
+                    >
+                      Salvar nível
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", margin: "12px 0 6px" }}>
+                    Unidades permitidas ({userAccess.unitIds.length})
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                      gap: 7,
+                    }}
+                  >
+                    {units.map((unit) => {
+                      const checked = userAccess.unitIds.includes(unit.id);
+                      return (
+                        <label
+                          key={unit.id}
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            padding: "8px 10px",
+                            borderRadius: 7,
+                            border: `1px solid ${checked ? "var(--brand)" : "var(--border)"}`,
+                            color: "var(--text-2)",
+                            fontSize: 12,
+                            opacity: userAccess.roleId ? 1 : 0.55,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={u.isFounder || pending || !userAccess.roleId}
+                            onChange={() =>
+                              setAccess((prev) => {
+                                const current = prev[u.id] ?? { roleId: null, unitIds: [] };
+                                const unitIds = current.unitIds.includes(unit.id)
+                                  ? current.unitIds.filter((id) => id !== unit.id)
+                                  : [...current.unitIds, unit.id];
+                                return { ...prev, [u.id]: { ...current, unitIds } };
+                              })
+                            }
+                            style={{ accentColor: "var(--brand)" }}
+                          />
+                          {unit.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {u.isFounder && (
+                    <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 8 }}>
+                      O nível de founders é protegido contra alteração.
+                    </div>
+                  )}
+                </div>
+
                 {/* Bulk actions */}
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
@@ -400,4 +568,16 @@ const bulkBtnStyle: React.CSSProperties = {
   color: "var(--text-2)",
   fontSize: 12,
   cursor: "pointer",
+};
+
+const selectStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  marginTop: 5,
+  padding: "8px 10px",
+  borderRadius: 7,
+  border: "1px solid var(--border)",
+  background: "var(--surface-2)",
+  color: "var(--text)",
+  fontSize: 12,
 };

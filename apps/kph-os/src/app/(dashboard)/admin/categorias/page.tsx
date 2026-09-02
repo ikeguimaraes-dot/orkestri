@@ -70,6 +70,35 @@ export default async function CategoriasAdminPage() {
   }
   const users = usersResult.users;
 
+  type RoleRow = { id: string; name: string; description: string | null };
+  type UnitRow = { id: string; name: string };
+  type UserRoleRow = { user_id: string; role_id: string; unit_id: string | null };
+  const [rolesResult, unitsResult, userRolesResult] = await Promise.all([
+    supabase.from("roles").select("id, name, description").order("name").returns<RoleRow[]>(),
+    supabase.from("units").select("id, name").eq("active", true).order("name").returns<UnitRow[]>(),
+    supabase.from("user_roles").select("user_id, role_id, unit_id").returns<UserRoleRow[]>(),
+  ]);
+
+  const accessError = rolesResult.error ?? unitsResult.error ?? userRolesResult.error;
+  if (accessError) {
+    return <ErrorState title="Erro ao carregar níveis de acesso" detail={accessError.message} />;
+  }
+
+  const accessByUser: Record<string, { roleId: string; unitIds: string[] }> = {};
+  for (const access of userRolesResult.data ?? []) {
+    const userAccess = accessByUser[access.user_id] ?? {
+      roleId: access.role_id,
+      unitIds: [],
+    };
+    accessByUser[access.user_id] = userAccess;
+    if (
+      access.unit_id &&
+      userAccess.roleId === access.role_id
+    ) {
+      userAccess.unitIds.push(access.unit_id);
+    }
+  }
+
   // Indexa vínculos por user_id pra lookup O(1) no client.
   const linksByUser = new Map<string, string[]>();
   for (const l of links ?? []) {
@@ -129,6 +158,9 @@ export default async function CategoriasAdminPage() {
           users={users}
           categories={categories ?? []}
           initialLinks={Object.fromEntries(linksByUser)}
+          roles={rolesResult.data ?? []}
+          units={unitsResult.data ?? []}
+          initialAccess={accessByUser}
         />
       )}
     </div>
