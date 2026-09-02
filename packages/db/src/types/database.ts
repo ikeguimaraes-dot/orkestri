@@ -2724,6 +2724,15 @@ export type Database = {
       };
     };
     Functions: {
+      admin_list_users: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          id: string;
+          email: string | null;
+          display_name: string | null;
+          is_founder: boolean;
+        }>;
+      };
       kph_is_founder: { Args: Record<string, never>; Returns: boolean };
       kph_is_founder_or_cfo: { Args: Record<string, never>; Returns: boolean };
       kph_has_role_for_unit: { Args: { p_unit_id: string }; Returns: boolean };

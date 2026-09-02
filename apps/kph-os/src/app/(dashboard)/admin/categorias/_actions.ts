@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServiceClient } from "@kph/db/supabase/server";
+import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import { requireRole } from "@kph/auth/server";
 
 /**
@@ -27,8 +27,8 @@ export async function setUserCategories(
     return { ok: false, error: "categoryIds precisa ser array" };
   }
 
-  const supabase = createServiceClient();
-  if (!supabase) return { ok: false, error: "Service role não configurada no servidor" };
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, error: "Supabase indisponível" };
 
   const uniqueCategoryIds = [...new Set(categoryIds)];
   if (uniqueCategoryIds.some((id) => typeof id !== "string" || !id)) {

@@ -64,13 +64,7 @@ export async function createSupabaseServerClient(
  */
 export function createServiceClient(): SupabaseClient<Database> | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  // Compatibilidade com a configuração atual da Vercel: após a consolidação
-  // dos bancos, OPERATIONS_SUPABASE_SERVICE_KEY também pertence ao projeto
-  // principal. O `trim` é importante porque uma variável definida como vazia
-  // não deve impedir o fallback.
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.OPERATIONS_SUPABASE_SERVICE_KEY?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) return null;
   return createClient<Database>(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },

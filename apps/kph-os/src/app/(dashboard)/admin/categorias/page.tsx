@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@kph/auth/server";
-import { createServiceClient, createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import type { Category, UserCategory } from "@kph/db/types/database";
 import { CategoriasAdminClient } from "./CategoriasAdminClient";
 
@@ -65,7 +65,6 @@ export default async function CategoriasAdminPage() {
       <ErrorState
         title="Erro ao carregar usuários"
         detail={usersResult.error}
-        hint="Configure SUPABASE_SERVICE_ROLE_KEY no servidor (inclusive na Vercel) e faça um novo deploy. Essa chave nunca deve ser pública."
       />
     );
   }
@@ -143,64 +142,28 @@ type AdminUser = {
   isFounder: boolean;
 };
 
+type AdminListUserRow = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  is_founder: boolean;
+};
+
 async function loadUsers(): Promise<
   { ok: true; users: AdminUser[] } | { ok: false; error: string }
 > {
-  const service = createServiceClient();
-  if (!service) {
-    return { ok: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada no servidor." };
-  }
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, error: "Supabase indisponível." };
 
-  const authUsers: Array<{ id: string; email?: string; user_metadata: Record<string, unknown> }> = [];
-  const perPage = 1000;
-  let page = 1;
-  while (true) {
-    const { data, error } = await service.auth.admin.listUsers({ page, perPage });
-    if (error) return { ok: false, error: `Supabase Auth: ${error.message}` };
-    authUsers.push(...data.users);
-    if (data.users.length < perPage) break;
-    page += 1;
-  }
+  const { data, error } = await supabase.rpc("admin_list_users");
+  if (error) return { ok: false, error: `Usuários: ${error.message}` };
 
-  type ProfileRow = { id: string; email: string | null; display_name: string | null };
-  const { data: profiles } = await service
-    .from("profiles")
-    .select("id, email, display_name")
-    .returns<ProfileRow[]>();
-  const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
-  const founderSet = new Set<string>();
-  const ids = authUsers.map((user) => user.id);
-
-  if (ids.length > 0) {
-    const { data: rolesData, error: rolesError } = await service
-      .from("user_roles")
-      .select("user_id, roles!inner(name)")
-      .in("user_id", ids)
-      .returns<Array<{ user_id: string; roles: { name: string } | { name: string }[] | null }>>();
-    if (rolesError) return { ok: false, error: `Permissões: ${rolesError.message}` };
-    for (const row of rolesData ?? []) {
-      const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-      if (role?.name === "founder") founderSet.add(row.user_id);
-    }
-  }
-
-  const users = authUsers.map((user) => {
-    const profile = profileById.get(user.id);
-    const metadataName = [
-      user.user_metadata?.display_name,
-      user.user_metadata?.full_name,
-      user.user_metadata?.name,
-    ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
-    return {
-      id: user.id,
-      email: profile?.email ?? user.email ?? null,
-      displayName: profile?.display_name ?? metadataName ?? null,
-      isFounder: founderSet.has(user.id),
-    };
-  });
-  users.sort((a, b) =>
-    (a.displayName ?? a.email ?? "").localeCompare(b.displayName ?? b.email ?? "", "pt-BR"),
-  );
+  const users = ((data ?? []) as AdminListUserRow[]).map((user) => ({
+    id: user.id,
+    email: user.email,
+    displayName: user.display_name,
+    isFounder: user.is_founder,
+  }));
   return { ok: true, users };
 }
 
