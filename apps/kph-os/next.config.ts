@@ -19,6 +19,8 @@ const zones = [
   { prefix: "/comercial",    origin: zoneUrl("COMERCIAL_APP_URL", 3005, "kph-os-ruptura.vercel.app") },
   { prefix: "/marca",        origin: zoneUrl("MARCA_APP_URL", 3006, "kph-os-marca.vercel.app") },
   { prefix: "/escritorio",   origin: zoneUrl("MARCA_APP_URL", 3006, "kph-os-marca.vercel.app") },
+  { prefix: "/clientes",     origin: zoneUrl("MARCA_APP_URL", 3006, "kph-os-marca.vercel.app") },
+  { prefix: "/frentes",      origin: zoneUrl("MARCA_APP_URL", 3006, "kph-os-marca.vercel.app") },
   { prefix: "/inteligencia", origin: zoneUrl("INTELIGENCIA_APP_URL", 3007, "kph-os-inteligencia.vercel.app") },
   { prefix: "/orquestrador", origin: zoneUrl("INTELIGENCIA_APP_URL", 3007, "kph-os-inteligencia.vercel.app") },
 ];
