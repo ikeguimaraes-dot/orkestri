@@ -30,6 +30,14 @@ const nextConfig = {
   // lockfiles fora do repo e quebra a resolução de módulos.
   turbopack: { root: path.join(import.meta.dirname, "../..") },
   transpilePackages: ["@kph/db", "@kph/ui", "@kph/auth", "@kph/core"],
+  async redirects() {
+    return [
+      // /marcas e /marca/* foram substituídos por /clientes (Sprint B — set/2026)
+      { source: "/marcas", destination: "/clientes", permanent: true },
+      { source: "/marca", destination: "/clientes", permanent: true },
+      { source: "/marca/:path*", destination: "/clientes", permanent: true },
+    ];
+  },
   async rewrites() {
     const afterFiles = zones.flatMap(({ prefix, origin }) => [
       // Static assets must be proxied before the page routes so the browser
