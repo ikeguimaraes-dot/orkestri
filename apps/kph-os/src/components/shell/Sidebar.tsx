@@ -27,7 +27,7 @@ import {
   // marca
   Bookmark, Info, Globe, Award,
   // inteligencia
-  Brain, Target, LineChart, Layers, Bug, Map, BarChart3, Workflow
+  Brain, Target, LineChart, Layers, Bug, Map, BarChart3, Workflow, ChartNoAxesCombined
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth, useUnit } from "@kph/auth/context";
@@ -44,7 +44,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   CalendarClock, Network, UserPlus, BarChart2, Calculator,
   Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
   Bookmark, Info, Globe, Award,
-  Brain, Target, LineChart, Layers, Bug, Map, BarChart3, Workflow,
+  Brain, Target, LineChart, Layers, Bug, Map, BarChart3, Workflow, ChartNoAxesCombined,
 };
 
 function resolveIcon(name: string | null): LucideIcon | null {

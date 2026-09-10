@@ -48,6 +48,7 @@ export const NAV_CONFIG: NavGroupConfig[] = [
       { label: "Performance", href: "/operacao/performance", icon: "Activity" },
       { label: "Vendedores", href: "/operacao/vendedores", icon: "UserCheck" },
       { label: "Auditorias", href: "/operacao/auditorias", icon: "ClipboardList" },
+      { label: "Indicadores de Auditoria MISE", href: "/operacao/indicadores-auditoria", icon: "ChartNoAxesCombined" },
       { label: "Eventos", href: "/operacao/eventos", icon: "CalendarDays", roles: ["gm", "founder", "comercial"] },
       { label: "Manutenção", href: "/operacao/manutencao", icon: "Wrench", roles: ["operacao", "founder", "administrativo"] },
       { label: "Pedidos", href: "/operacao/pedidos", icon: "ShoppingCart", roles: ["operacao", "founder", "administrativo"] },
