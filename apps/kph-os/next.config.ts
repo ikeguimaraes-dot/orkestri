@@ -35,13 +35,8 @@ const nextConfig = {
       // /marcas e /marca/* foram substituídos por /clientes (Sprint B — set/2026)
       { source: "/marcas", destination: "/clientes", permanent: true },
       { source: "/marca", destination: "/clientes", permanent: true },
-      // Não usar /marca/:path*: os assets do app Marca vivem em
-      // /marca/_next e seriam redirecionados para /clientes, deixando a zona
-      // sem CSS e JavaScript no proxy local.
-      { source: "/marca/brandbook", destination: "/clientes", permanent: true },
-      { source: "/marca/quem-somos", destination: "/clientes", permanent: true },
-      { source: "/marca/canais", destination: "/clientes", permanent: true },
-      { source: "/marca/reputacao", destination: "/clientes", permanent: true },
+      // Exclui _next e api: kph-os-marca serve assets via /marca/_next (assetPrefix)
+      { source: "/marca/((?!_next|api).+)", destination: "/clientes", permanent: true },
     ];
   },
   async rewrites() {

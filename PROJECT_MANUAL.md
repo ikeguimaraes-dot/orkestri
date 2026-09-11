@@ -39,6 +39,23 @@ acessados diretamente em produção.
 
 ---
 
+## Regra de assets das zonas
+
+**kph-os-marca usa `assetPrefix: "/marca"`** — o browser solicita todos os chunks
+em `/marca/_next/...`. Nenhum redirect ou rewrite pode capturar `/marca/_next` ou
+`/marca/api`, ou os chunks não chegam ao browser (zona fica em branco).
+
+Padrão correto para redirects de zona com assetPrefix:
+```ts
+// ERRADO — captura assets:
+{ source: "/marca/:path*", destination: "/clientes", permanent: true }
+
+// CORRETO — exclui _next e api:
+{ source: "/marca/((?!_next|api).+)", destination: "/clientes", permanent: true }
+```
+
+---
+
 ## Redirects permanentes (308)
 
 Rotas antigas redirecionam para as novas via `redirects()` em `next.config.ts`.
