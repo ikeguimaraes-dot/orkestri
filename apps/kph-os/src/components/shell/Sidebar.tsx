@@ -537,7 +537,7 @@ function SidebarNav({
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const m: Record<string, boolean> = {};
-    for (const g of visibleGroups) m[g.id] = g.defaultOpen;
+    for (const g of visibleGroups) m[g.id] = !g.title;
     return m;
   });
   const [openItems, setOpenItems] = useState<Record<string, boolean>>(() => {
@@ -554,6 +554,14 @@ function SidebarNav({
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      // O dashboard e o ponto de entrada após o login: sempre inicia com
+      // todos os grupos nomeados recolhidos, ignorando estado antigo.
+      if (pathname === "/dashboard") {
+        window.localStorage.removeItem(STORAGE_KEY);
+        setOpenMap(Object.fromEntries(visibleGroups.map((g) => [g.id, !g.title])));
+        setHydrated(true);
+        return;
+      }
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, boolean>;
@@ -564,7 +572,7 @@ function SidebarNav({
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pathname, visibleGroups]);
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -597,6 +605,37 @@ function SidebarNav({
     });
   }
 
+  function firstGroupHref(group: NavGroup): string | null {
+    const landingByGroup: Record<string, string> = {
+      operacao: "/operacao",
+      compras: "/compras",
+      financeiro: "/financeiro",
+      pessoas: "/pessoas",
+      comercial: "/comercial",
+      marca: "/escritorio",
+      admin: "/admin/categorias",
+      inteligencia: "/inteligencia",
+    };
+    const preferred = landingByGroup[group.id];
+    if (preferred && allItems.some((item) => item.groupId === group.id && item.href === preferred)) {
+      return preferred;
+    }
+    for (const item of group.items) {
+      if (item.href) return item.href;
+      const childHref = item.children?.find((child) => child.href)?.href;
+      if (childHref) return childHref;
+    }
+    return null;
+  }
+
+  function handleGroupClick(group: NavGroup, isOpen: boolean) {
+    toggleGroup(group.id);
+    if (isOpen) return;
+
+    const firstHref = firstGroupHref(group);
+    if (firstHref && firstHref !== pathname) window.location.assign(firstHref);
+  }
+
   function toggleItem(label: string) {
     setOpenItems((prev) => ({ ...prev, [label]: !prev[label] }));
   }
@@ -613,13 +652,13 @@ function SidebarNav({
       }}
     >
       {visibleGroups.map((g) => {
-        const isOpen = openMap[g.id] ?? g.defaultOpen;
+        const isOpen = openMap[g.id] ?? !g.title;
         return (
           <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {g.title && (
               <button
                 type="button"
-                onClick={() => toggleGroup(g.id)}
+                onClick={() => handleGroupClick(g, isOpen)}
                 aria-expanded={isOpen}
                 style={{
                   display: "flex",
