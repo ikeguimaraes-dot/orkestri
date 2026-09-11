@@ -208,10 +208,11 @@ export const NAV_CONFIG: NavGroupConfig[] = [
     category: "marca",
     defaultOpen: false,
     items: [
-      { label: "Escritório", href: "/escritorio", icon: "Building2" },
-      { label: "Frentes", href: "/frentes", icon: "ListChecks" },
-      { label: "Clientes", href: "/clientes", icon: "Bookmark" },
-      { label: "Dashboard", href: "/frentes/dashboard", icon: "LayoutDashboard" },
+      { label: "Escritório",  href: "/escritorio",  icon: "Building2" },
+      { label: "Frentes",     href: "/frentes",     icon: "ListChecks" },
+      { label: "Organograma", href: "/organograma", icon: "Network" },
+      { label: "Clientes",    href: "/clientes",    icon: "Bookmark" },
+      { label: "Dashboard",   href: "/frentes/dashboard", icon: "LayoutDashboard" },
     ],
   },
   {
