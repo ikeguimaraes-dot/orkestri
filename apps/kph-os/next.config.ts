@@ -35,7 +35,8 @@ const nextConfig = {
       // /marcas e /marca/* foram substituídos por /clientes (Sprint B — set/2026)
       { source: "/marcas", destination: "/clientes", permanent: true },
       { source: "/marca", destination: "/clientes", permanent: true },
-      { source: "/marca/:path*", destination: "/clientes", permanent: true },
+      // Exclui _next e api: kph-os-marca serve assets via /marca/_next (assetPrefix)
+      { source: "/marca/((?!_next|api).+)", destination: "/clientes", permanent: true },
     ];
   },
   async rewrites() {
