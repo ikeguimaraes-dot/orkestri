@@ -69,7 +69,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Tudo, EXCETO: assets do Next, arquivos estáticos, imagens e fontes.
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf)$).*)",
+    // Tudo, EXCETO: pipeline do Next.js, rotas de API e arquivos estáticos.
+    // _next/ cobre static, image e chunks — assets nunca passam por auth.
+    // api/ cobre todos os route handlers — auth é responsabilidade de cada rota.
+    "/((?!_next/|api/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf)$).*)",
   ],
 };
